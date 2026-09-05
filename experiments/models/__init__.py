@@ -11,6 +11,12 @@ from importlib import import_module
 REGISTRY = {
     "mnl_only": ("experiments.models.baseline", "build_mnl_only"),
     "hybrid_base": ("experiments.models.baseline", "build_hybrid_base"),
+    "pref_dual": ("experiments.models.pref", "build_pref_dual"),
+    "pref_dual_sem": ("experiments.models.pref", "build_pref_dual_sem"),
+    "pref_mix": ("experiments.models.pref", "build_pref_mix"),
+    "pref_mix_sem": ("experiments.models.pref", "build_pref_mix_sem"),
+    "pref_mnl_cal": ("experiments.models.pref", "build_pref_mnl_cal"),
+    "pref_mnl_unif": ("experiments.models.pref", "build_pref_mnl_unif"),
 }
 
 
