@@ -11,6 +11,9 @@ from importlib import import_module
 REGISTRY = {
     "mnl_only": ("experiments.models.baseline", "build_mnl_only"),
     "hybrid_base": ("experiments.models.baseline", "build_hybrid_base"),
+    # numeric-aware concept heads (experiments/models/ncat.py); other builders there were tried, not kept
+    "ncat_v2": ("experiments.models.ncat", "build_ncat_v2"),
+    "ncat_v3": ("experiments.models.ncat", "build_ncat_v3"),
 }
 
 
