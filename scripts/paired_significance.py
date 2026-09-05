@@ -22,10 +22,10 @@ CLI
 ---
 
     python -m scripts.paired_significance \\
-        --input-dir results_data/ \\
+        --input-dir amazon/results/ \\
         --tag-pattern "main_seed*" \\
         --baseline-of-interest "PO-LEU" \\
-        --output-dir results_data/significance/ \\
+        --output-dir amazon/results/significance/ \\
         [--bootstrap-iterations 1000] \\
         [--confidence-level 0.95] \\
         [--seed 0]

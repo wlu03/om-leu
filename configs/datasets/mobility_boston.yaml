@@ -24,7 +24,7 @@ dataset:
     industry, education tier, income tier (3-bin).
 
   events:
-    path: mobility_trajectory_boston/events.csv
+    path: mobility_boston/data/events.csv
     parse_dates:
       - to_local_timestamp
     column_map:
@@ -45,7 +45,7 @@ dataset:
       asin: str
 
   persons:
-    path: mobility_trajectory_boston/persons.csv
+    path: mobility_boston/data/persons.csv
     id_column: caid
 
     z_d_mapping:

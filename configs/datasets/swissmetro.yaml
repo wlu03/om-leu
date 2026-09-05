@@ -1,0 +1,185 @@
+# Swissmetro stated-preference survey (Bierlaire, Axhausen & Abay 2001;
+# Biogeme example data, https://transp-or.epfl.ch/pythonbiogeme/examples_swissmetro.html).
+# 1,192 respondents x 9 hypothetical scenarios choosing between regular
+# train, the proposed Swissmetro maglev, and car for one intercity trip.
+# Preprocessed by scripts/prepare_swissmetro.py, which writes events.csv,
+# persons.csv, impressions.csv (per-(scenario, mode) time / cost /
+# headway / seating) and properties.csv (the three modes).
+#
+# Schema notes:
+#   * "asin" is the chosen mode id (train | sm | car); the choice set is
+#     the set of AVAILABLE modes, kept only when all three are available
+#     so J=3 is uniform (84% of scenarios, 1,004 respondents).
+#   * "category" is the trip purpose (commute / business / leisure ...).
+#   * "price" is the chosen mode's cost in CHF. Following the standard
+#     Biogeme specification, rail costs are 0 for GA season-ticket
+#     holders (the raw file stores the annual ticket price there).
+#   * "order_date" is a pseudo-date: scenario index within the respondent
+#     (day 1..9). The SP scenarios are not time-ordered; the per-
+#     respondent temporal split therefore holds out the last scenario
+#     for test and the one before for validation (7 / 1 / 1).
+#   * Respondent covariates: age class and income class map onto the
+#     canonical buckets; GA, first-class habit and survey group become
+#     profile lines in c_d; gender renders inline.
+
+dataset:
+  name: swissmetro
+  description: >
+    Swissmetro SP mode-choice survey, 1998 (Biogeme example data). One event
+    per respondent x scenario; the chosen alternative is the stated choice
+    among train, Swissmetro and car.
+
+  events:
+    path: swissmetro/data/events.csv
+    parse_dates:
+      - pseudo_date
+    column_map:
+      respondent_id:   customer_id
+      pseudo_date:     order_date
+      alt_id:          asin
+      purpose_label:   category
+      cost_chf:        price
+      alt_label:       title
+    dropna_subset:
+      - customer_id
+      - order_date
+      - asin
+    category_null_fill: "Unknown"
+    dtype_coerce:
+      price: float
+      customer_id: str
+      asin: str
+
+  persons:
+    path: swissmetro/data/persons.csv
+    id_column: respondent_id
+
+    z_d_mapping:
+
+      # AGE classes (<=24, 24-39, 39-54, 54-65, >65, unknown) -> canonical
+      # Amazon labels closest in range; "unknown" (9 rows) is dropped.
+      age_bucket:
+        source: age_class
+        kind: categorical_map
+        values:
+          "under_25":  "18-24"
+          "25_to_39":  "25-34"
+          "39_to_54":  "45-54"
+          "54_to_65":  "55-64"
+          "over_65":   "65+"
+        drop_on_unknown:
+          - "unknown"
+
+      # INCOME [thousand CHF]: under 50 / 50-100 / over 100 / unknown.
+      # Unknown (about 8% of respondents) is imputed to the modal class.
+      income_bucket:
+        source: income_class
+        kind: categorical_map
+        values:
+          "under_50k":   "25-50k"
+          "50k_to_100k": "50-100k"
+          "over_100k":   "100-150k"
+          "unknown":     "50-100k"
+
+      city_size:
+        source: null
+        kind: constant
+        value: "large"
+
+      household_size:
+        source: null
+        kind: constant
+        value: 2
+
+      has_kids:
+        source: null
+        kind: constant
+        value: 0
+
+      education:
+        source: null
+        kind: constant
+        value: 3
+
+      health_rating:
+        source: null
+        kind: constant
+        value: 3
+
+      # No risk-attitude question; constant -> suppressed from c_d. The
+      # first-class habit reaches the generator through profile_lines.
+      risk_tolerance:
+        source: null
+        kind: constant
+        value: 0
+
+      purchase_frequency:
+        source: derived_from_events
+        aggregator: count
+        group_by: customer_id
+
+      novelty_rate:
+        source: derived_from_events
+        aggregator: mean
+        aggregator_column: novelty
+        group_by: customer_id
+
+    c_d_extra_fields:
+      gender:
+        source: gender_label
+        kind: passthrough
+      profile_lines:
+        source: profile_lines
+        kind: passthrough
+      domain_verb:
+        kind: constant
+        value: "Makes intercity trips"
+      activity_noun:
+        kind: constant
+        value: "trips"
+      novelty_object:
+        kind: constant
+        value: "mode choices"
+      self_report_verb:
+        kind: constant
+        value: "Travels"
+      # Income classes are in thousand CHF, not USD.
+      currency:
+        kind: constant
+        value: "CHF"
+      # The "recent purchases" line lists the modes chosen in the
+      # respondent's previous scenarios.
+      recent_label:
+        kind: constant
+        value: "Modes chosen in recent scenarios"
+      # Customer-aggregate enrichment (configs/default.yaml
+      # data.enrich_customer_context) rephrased for mode choice.
+      top_brand_label:
+        kind: constant
+        value: "Mode chosen most often so far"
+      top_categories_label:
+        kind: constant
+        value: "Most common trip purposes"
+      avg_price_label:
+        kind: constant
+        value: "Typical cost of the option they pick"
+      repeat_rate_label:
+        kind: constant
+        value: "of their choices repeat a mode they had already picked"
+
+  training:
+    choice_set_size: 3         # J: train | sm | car
+    n_resamples: 1
+    val_frac: 0.12             # 9 scenarios -> 7 train / 1 val / 1 test
+    test_frac: 0.12
+    subsample:
+      enabled: false
+      n_customers: 100
+      seed: 42
+
+# Adapter-specific extras read by scripts/run_dataset.py.
+swissmetro:
+  impressions_path: swissmetro/data/impressions.csv
+  properties_path: swissmetro/data/properties.csv
+  slate_column: slate_alt_ids
+  scenario_id_column: scenario_id

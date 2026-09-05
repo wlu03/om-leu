@@ -26,7 +26,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = REPO_ROOT / "mobility_trajectory_boston"
+DATA_DIR = REPO_ROOT / "mobility_boston" / "data"
 INPUT_FILES = [
     (2019, DATA_DIR / "veraset_boston_aligned_agents_2019.jsonl"),
     (2020, DATA_DIR / "veraset_boston_aligned_agents_2020.jsonl"),

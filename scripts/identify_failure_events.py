@@ -34,9 +34,9 @@ Output schema (``failure_events.json``):
 Usage::
 
     python -m scripts.identify_failure_events \\
-        --run-dir results_data/poleu_50cust_seed7_no_residual \\
+        --run-dir amazon/results/poleu_50cust_seed7_no_residual \\
         --top-k 20 \\
-        --output results_data/poleu_50cust_seed7_no_residual/failure_events.json
+        --output amazon/results/poleu_50cust_seed7_no_residual/failure_events.json
 """
 
 from __future__ import annotations

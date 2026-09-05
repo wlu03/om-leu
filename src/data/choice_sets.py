@@ -142,8 +142,26 @@ def build_choice_sets(
     add_event_time_to_c_d: bool = False,
     add_event_origin_to_c_d: bool = False,
     per_event_alt_overrides_fn=None,
+    real_slate_column: str | None = None,
+    alt_catalog: pd.DataFrame | None = None,
+    per_event_context_fn=None,
 ) -> list[dict]:
     """Return per-event choice-set records with ``z_d`` and ``c_d`` attached.
+
+    Real displayed slates (Expedia-style impression logs)
+    -----------------------------------------------------
+    When ``real_slate_column`` is given, negatives are NOT sampled: the
+    named ``events_df`` column holds the pipe-joined list of alternative
+    ids the decision-maker actually saw (chosen included), already
+    trimmed to exactly ``n_negatives + 1`` entries. Each slate is
+    shuffled with the same per-event RNG the sampled path uses so the
+    chosen position stays uniformly random. ``alt_catalog`` (columns
+    ``asin, title, category, price, brand``) supplies alt-text for slate
+    members that never appear as a chosen item (they would otherwise
+    render as empty strings); rows for asins already in the event-derived
+    lookup are ignored. ``per_event_context_fn(event_idx) -> str | None``
+    renders a per-event decision-situation phrase into ``c_d``
+    (see :func:`build_context_string`'s ``event_context``).
 
     Shape contract
     --------------
@@ -323,9 +341,30 @@ def build_choice_sets(
     # subtracting 1 from the chosen alt's count when ``record["split"]
     # == "train"`` AND the chosen ASIN appears in this map's count.
     # --------------------------------------------------------------- #
-    _cust_asin_counts = (
-        ref_df.groupby(["customer_id", "asin"]).size().to_dict()
+    # Per-(customer, asin) sorted train purchase dates. The prior count for
+    # an event at date ``d`` is the number of TRAIN purchases of that asin
+    # by that customer strictly before ``d`` (bisect). This replaces the
+    # old total-train-count map, which for TRAIN events also counted the
+    # customer's LATER train purchases of the same asin (a within-train
+    # future leak that made ``is_repeat`` / ``purchase_count`` look more
+    # informative at train time than they can be at test time; the
+    # "subtract 1 for the chosen" hack only removed the event's own row).
+    _cust_asin_dates: dict[tuple, list] = {}
+    _ref_dates_ns = (
+        pd.to_datetime(ref_df["order_date"]).to_numpy().astype("datetime64[ns]")
     )
+    for _cid, _asin, _d in zip(
+        ref_df["customer_id"].to_numpy(), ref_df["asin"].to_numpy(), _ref_dates_ns
+    ):
+        _cust_asin_dates.setdefault((_cid, _asin), []).append(_d)
+    for _lst in _cust_asin_dates.values():
+        _lst.sort()
+
+    def _prior_count(cid, asin, ev_date) -> int:
+        dates = _cust_asin_dates.get((cid, asin))
+        if not dates:
+            return 0
+        return int(bisect_left(dates, ev_date))
 
     # --------------------------------------------------------------- #
     # Per-customer caches (O(n_customers), not O(n_events)).
@@ -402,6 +441,32 @@ def build_choice_sets(
         }
         for _, row in first_seen_rows.iterrows()
     }
+
+    # Real-slate members that were never chosen have no event row to
+    # describe them; ``alt_catalog`` fills those in (never overriding an
+    # event-derived entry, so the chosen/negative symmetry is untouched).
+    if alt_catalog is not None and len(alt_catalog) > 0:
+        n_added = 0
+        for _, crow in alt_catalog.iterrows():
+            a = str(crow["asin"])
+            if a in asin_lookup:
+                continue
+            try:
+                cprice = float(crow.get("price", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                cprice = 0.0
+            asin_lookup[a] = {
+                "title": str(crow.get("title", "") or ""),
+                "category": str(crow.get("category", "") or ""),
+                "price": cprice,
+                "popularity": 0,
+                "brand": str(crow.get("brand", "") or ""),
+            }
+            n_added += 1
+        logger.info(
+            "build_choice_sets: alt_catalog added %d never-chosen alternatives "
+            "to asin_lookup (%d total).", n_added, len(asin_lookup),
+        )
 
     # Default lookup for any asin not in the table (shouldn't happen in
     # practice: sampled negatives come from rows in df itself).
@@ -844,14 +909,16 @@ def build_choice_sets(
         negatives' came from a per-asin first-seen lookup.
         """
         out: list[dict] = []
+        ev_date_for_count = order_dates_ns[event_idx]
+        _ = adjust_chosen_self_count  # superseded by the strictly-prior count
         for a in asins:
             if a == chosen_asin:
                 d = adapter.alt_text(event_row_alt)
             else:
                 d = adapter.alt_text(asin_lookup.get(a, dict(_DEFAULT_ALT)))
-            cnt = int(_cust_asin_counts.get((cid, a), 0))
-            if a == chosen_asin and adjust_chosen_self_count and cnt > 0:
-                cnt -= 1
+            # Strictly-prior train history of (customer, asin) — identical
+            # rule for the chosen and every non-chosen alternative.
+            cnt = _prior_count(cid, a, ev_date_for_count)
             d["is_repeat"] = 1.0 if cnt > 0 else 0.0
             d["purchase_count"] = cnt
             if per_event_alt_overrides_fn is not None:
@@ -871,6 +938,25 @@ def build_choice_sets(
     # semantics.
     MAX_RESAMPLE_ROUNDS = 5
     J = n_negatives + 1
+
+    # Real displayed slates: one pipe-joined string per event. Parsed
+    # lazily per event below; the sampled-negative loop is skipped
+    # entirely (``n_sampled_reps == 0``) when a slate column is given.
+    if real_slate_column is not None:
+        if real_slate_column not in df.columns:
+            raise ValueError(
+                f"build_choice_sets: real_slate_column={real_slate_column!r} "
+                f"is not a column of events_df."
+            )
+        slate_arr = df[real_slate_column].astype(str).to_numpy(dtype=object)
+        n_sampled_reps = 0
+        logger.info(
+            "build_choice_sets: using REAL displayed slates from column %r "
+            "(no negative sampling; J=%d).", real_slate_column, J,
+        )
+    else:
+        slate_arr = None
+        n_sampled_reps = n_resamples
 
     # Group-2 (category injection): freeze the category vocabulary as a
     # tuple of strings parallel to cat_codes_cat.categories. Stashed on
@@ -910,14 +996,50 @@ def build_choice_sets(
         # those events than see padded choice sets set
         # ``drop_pool_starved=True`` — statistically cleanest; loses some
         # events from thin customers / very-late timeline positions.
-        if drop_pool_starved and available_neg_pool_size < n_negatives:
+        if (
+            drop_pool_starved
+            and slate_arr is None
+            and available_neg_pool_size < n_negatives
+        ):
             n_dropped_pool_starved += 1
             continue
 
         samples_per_k: List[List[str]] = []
         chosen_idx_per_k: List[int] = []
         dedup_fallback_per_k: List[bool] = []
-        for k_rep in range(n_resamples):
+
+        if slate_arr is not None:
+            # --- real displayed slate ------------------------------------ #
+            chosen_asin_str = str(catalog[chosen_code])
+            slate_members = [
+                s.strip() for s in str(slate_arr[i]).split("|") if s.strip()
+            ]
+            if len(slate_members) != J:
+                raise ValueError(
+                    f"build_choice_sets: event {i} (customer={customer_ids[i]!r}) "
+                    f"has a slate of {len(slate_members)} alternatives; the "
+                    f"prepare step must emit exactly J={J} per event."
+                )
+            if chosen_asin_str not in slate_members:
+                raise ValueError(
+                    f"build_choice_sets: event {i} (customer={customer_ids[i]!r}) "
+                    f"chosen asin {chosen_asin_str!r} is not in its slate."
+                )
+            if len(set(slate_members)) != J:
+                raise ValueError(
+                    f"build_choice_sets: event {i} slate contains duplicates."
+                )
+            for k_rep in range(n_resamples):
+                # Same per-event RNG formula as the sampled path so the
+                # chosen position is uniformly random and reproducible.
+                local_rng = np.random.default_rng(seed + 1_000_003 * k_rep + i)
+                perm = local_rng.permutation(J)
+                shuffled = [slate_members[int(p)] for p in perm]
+                samples_per_k.append(shuffled)
+                chosen_idx_per_k.append(int(shuffled.index(chosen_asin_str)))
+                dedup_fallback_per_k.append(False)
+
+        for k_rep in range(n_sampled_reps):
             # Deterministic per-event per-resample RNG seeding (v1 formula
             # — DO NOT change). This is what pins the integration test.
             local_rng = np.random.default_rng(seed + 1_000_003 * k_rep + i)
@@ -1133,6 +1255,10 @@ def build_choice_sets(
         else:
             event_origin_phrase = None
 
+        event_context_phrase = (
+            per_event_context_fn(i) if per_event_context_fn is not None else None
+        )
+
         event_c_d = build_context_string(
             customer_to_row[cid],
             suppress_fields=suppress,
@@ -1140,6 +1266,7 @@ def build_choice_sets(
             recent_purchases=event_recent,
             current_time=event_time_phrase,
             event_origin=event_origin_phrase,
+            event_context=event_context_phrase,
         )
 
         # Defensive z_d lookup. The coverage assertion at the top of

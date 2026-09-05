@@ -377,11 +377,23 @@ def extract_letter_logprobs(
             return (exp / total).astype(np.float64)
         # Fall through to text parsing.
 
+    # OpenAI-style ChatCompletion carrying token logprobs.
+    openai_vec = _try_extract_openai_top_logprobs(response, letters)
+    if openai_vec is not None:
+        shifted = openai_vec - np.max(openai_vec)
+        exp = np.exp(shifted)
+        total = exp.sum()
+        if total > 0 and np.isfinite(total):
+            return (exp / total).astype(np.float64)
+
     # String / stub path.
     text = _response_as_text(response)
     verbal = _parse_verbalized_json(text, letters)
     if verbal is not None:
         return verbal
+    bare = _parse_bare_letter(text, letters)
+    if bare is not None:
+        return bare
     return _stub_letter_probs(text, letters)
 
 
@@ -405,6 +417,13 @@ def _response_as_text(response: Any) -> str:
                 parts.append(getattr(block, "text", "") or "")
         if parts:
             return "".join(parts)
+    # OpenAI-style ChatCompletion: response.choices[0].message.content.
+    choices = getattr(response, "choices", None)
+    if isinstance(choices, list) and choices:
+        message = _get(choices[0], "message")
+        msg_text = _get(message, "content") if message is not None else None
+        if isinstance(msg_text, str):
+            return msg_text
     return str(response)
 
 
@@ -453,11 +472,72 @@ def _scan_top_logprobs_for_letters(
             lp_val = float(logprob)
         except (TypeError, ValueError):
             continue
-        stripped = str(token).strip().rstrip(")")
+        # Tokenizer variants: " A", "(A", "A)", "A.", "**A" ...
+        stripped = str(token).strip().strip("()*.:")
         for i, letter in enumerate(letters):
             if stripped == letter and lp_val > out[i]:
                 out[i] = lp_val
     return out
+
+
+def _try_extract_openai_top_logprobs(
+    response: Any, letters: Sequence[str]
+) -> Optional[np.ndarray]:
+    """Return a letter logprob vector from an OpenAI-style ChatCompletion.
+
+    OpenAI-compatible servers (OpenAI, vLLM, llama.cpp, LM Studio) expose
+    ``response.choices[0].logprobs.content[i].top_logprobs`` — a list of
+    ``{token, logprob}`` records per generated position. We take the first
+    generated position whose top-K contains at least one letter (the
+    answer is asked for as a bare letter, so that is normally position 0)
+    and scan it for the letter set.
+
+    Returns ``None`` when the response carries no usable logprobs.
+    """
+    choices = getattr(response, "choices", None)
+    if not choices:
+        return None
+    first = choices[0]
+    lp = _get(first, "logprobs")
+    if lp is None:
+        return None
+    content = _get(lp, "content")
+    if not content:
+        return None
+    for position in content:
+        top_list = _get(position, "top_logprobs")
+        if not top_list:
+            continue
+        vec = _scan_top_logprobs_for_letters(top_list, letters)
+        if np.isfinite(vec).any():
+            return vec
+    return None
+
+
+_BARE_LETTER_RE = re.compile(r"^\s*[\(\[\*\s]*([A-Za-z])[\)\]\.\:\*]?(?=\s|$)")
+
+
+def _parse_bare_letter(text: str, letters: Sequence[str]) -> Optional[np.ndarray]:
+    """Parse a bare-letter answer (``"B"``, ``"(B)"``, ``"b."``) into probabilities.
+
+    A single letter carries no calibrated distribution, so the parsed
+    letter gets 0.9 and the remaining mass is spread uniformly over the
+    other letters (keeps NLL finite on misses). Returns ``None`` when the
+    text does not start with one of ``letters``.
+    """
+    m = _BARE_LETTER_RE.match(text or "")
+    if m is None:
+        return None
+    letter = m.group(1).upper()
+    upper = [str(l).upper() for l in letters]
+    if letter not in upper:
+        return None
+    n = len(letters)
+    if n == 1:
+        return np.ones(1, dtype=np.float64)
+    probs = np.full(n, 0.1 / (n - 1), dtype=np.float64)
+    probs[upper.index(letter)] = 0.9
+    return probs
 
 
 def _get(entry: Any, key: str) -> Any:
@@ -578,6 +658,21 @@ def call_llm_for_ranking(
             model_id=model_id,
         )
 
+    if _is_openai_client(client):
+        vec = _call_openai_for_ranking(
+            client,
+            system=system,
+            user=user,
+            letters=letters,
+            temperature=float(temperature),
+            max_tokens=int(max_tokens),
+            top_logprobs=int(top_logprobs),
+            seed=int(seed),
+            model_id=model_id,
+        )
+        if vec is not None:
+            return vec
+
     # Generic LLMClient: go through ``generate`` and parse whatever comes
     # back (verbalised JSON, raw letter, or fall through to the hash).
     messages = [
@@ -592,6 +687,82 @@ def call_llm_for_ranking(
         seed=int(seed),
     )
     return extract_letter_logprobs(result, letters)
+
+
+def _is_openai_client(client: LLMClient) -> bool:
+    """Duck-type check: does ``client`` wrap an OpenAI-style SDK handle?
+
+    True for :class:`src.outcomes._openai_client.OpenAILLMClient` whether
+    it points at api.openai.com or at an OpenAI-compatible server (vLLM,
+    llama.cpp, LM Studio, Ollama ``/v1``): all expose
+    ``_client.chat.completions.create``.
+    """
+    if getattr(client, "_is_stub", False):
+        return False
+    inner = getattr(client, "_client", None)
+    if inner is None:
+        return False
+    chat = getattr(inner, "chat", None)
+    completions = getattr(chat, "completions", None) if chat is not None else None
+    return completions is not None and hasattr(completions, "create")
+
+
+_LETTER_ONLY_INSTRUCTION = (
+    "\n\nAnswer with the single capital letter of the alternative you choose "
+    "and nothing else."
+)
+
+
+def _call_openai_for_ranking(
+    client: LLMClient,
+    *,
+    system: str,
+    user: str,
+    letters: Sequence[str],
+    temperature: float,
+    max_tokens: int,
+    top_logprobs: int,
+    seed: int,
+    model_id: Optional[str] = None,
+) -> Optional[np.ndarray]:
+    """Rank via an OpenAI-compatible endpoint with token logprobs.
+
+    Requests ``logprobs=True, top_logprobs=N`` on a one-or-two-token
+    answer and softmaxes the letter logprobs of the first generated
+    position (the same estimator as the Anthropic path). When the server
+    returns no logprobs, the text is parsed as a bare letter, then as
+    verbalised JSON, and only then hashed. Returns ``None`` if the request
+    itself fails, so the caller can fall back to ``client.generate``.
+    """
+    inner = getattr(client, "_client", None)
+    resolved_model = model_id or getattr(client, "model_id", None)
+    if inner is None or not resolved_model:
+        return None
+    kwargs: Dict[str, Any] = {
+        "model": resolved_model,
+        "messages": [
+            {"role": "system", "content": system + _LETTER_ONLY_INSTRUCTION},
+            {"role": "user", "content": user},
+        ],
+        "max_tokens": max(1, int(max_tokens)),
+        "temperature": float(temperature),
+        "seed": int(seed),
+        "logprobs": True,
+        "top_logprobs": int(min(max(int(top_logprobs), 1), 20)),
+    }
+    extra_body = getattr(client, "_extra_body", None)
+    if extra_body:
+        kwargs["extra_body"] = dict(extra_body)
+    try:
+        response = inner.chat.completions.create(**kwargs)
+    except Exception as exc:  # noqa: BLE001 - SDK raises varied errors here
+        logger.warning(
+            "OpenAI-compatible chat.completions.create(logprobs=True) failed (%s); "
+            "falling back to the generic generate() path.",
+            exc,
+        )
+        return None
+    return extract_letter_logprobs(response, letters)
 
 
 def _call_anthropic_for_ranking(

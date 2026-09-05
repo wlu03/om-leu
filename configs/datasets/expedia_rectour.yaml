@@ -1,0 +1,153 @@
+# Expedia Group RecTour research dataset (Woznica & Krasnodebski, RecTour
+# 2021; CC BY-NC 4.0, distributed on request by Expedia Group).
+# Each event row is one lodging SEARCH with a chosen property (booked, else
+# most-clicked); the displayed impression list is the choice set (real
+# slate, no sampled negatives). Preprocessed by
+# scripts/prepare_expedia_rectour.py, which writes events.csv, persons.csv,
+# impressions.csv (per-search alternative attributes) and properties.csv
+# (per-property constants for never-chosen slate members).
+#
+# Schema notes:
+#   * "asin" maps to prop_id (the chosen property); "category" is the
+#     search destination ("destination <id>"); "title" is a synthesized
+#     property label (id + amenities); "price" is the displayed price
+#     TIER 1..5 of the chosen property (the impressions file supplies the
+#     tier of every other slate member per search).
+#   * RecTour has no demographics. age / income / city / education /
+#     health / risk are constants and therefore suppressed from c_d (the
+#     renderer never fabricates a demographic line). Household size and
+#     has_kids come from the user's typical search party; income proxy is
+#     deliberately NOT derived from spend (it would just restate price).
+#   * The slate column and search-parameter columns survive the rename
+#     untouched and are consumed by src/data/expedia_slates.py.
+
+dataset:
+  name: expedia_rectour
+  description: >
+    Expedia Group RecTour research dataset: lodging search impressions on
+    Brand Expedia sites, 2021-06-01 to 2021-07-31. One event per search
+    with a booked or clicked property; the displayed impressions form the
+    choice set.
+
+  events:
+    path: expedia_rectour/data/events.csv
+    parse_dates:
+      - search_timestamp
+    column_map:
+      user_id:            customer_id
+      search_timestamp:   order_date
+      prop_id:            asin
+      destination_label:  category
+      price_bucket:       price
+      prop_label:         title
+    dropna_subset:
+      - customer_id
+      - order_date
+      - asin
+    category_null_fill: "Unknown"
+    dtype_coerce:
+      price: float
+      customer_id: str
+      asin: str
+
+  persons:
+    path: expedia_rectour/data/persons.csv
+    id_column: user_id
+
+    z_d_mapping:
+
+      # No age signal in RecTour; constant -> suppressed from c_d.
+      age_bucket:
+        source: null
+        kind: constant
+        value: "35-44"
+
+      # No income signal; constant -> suppressed from c_d.
+      income_bucket:
+        source: null
+        kind: constant
+        value: "50-100k"
+
+      city_size:
+        source: null
+        kind: constant
+        value: "large"
+
+      # Typical search party (adults + children) on the user's earliest
+      # 80% of searches -> the canonical 1..5+ household bins.
+      household_size:
+        source: party_size_bucket
+        kind: categorical_to_int
+        values:
+          "solo":      1
+          "pair":      2
+          "three":     3
+          "four":      4
+          "five_plus": 5
+
+      # 1 if any early search included children.
+      has_kids:
+        source: has_kids
+        kind: passthrough
+
+      education:
+        source: null
+        kind: constant
+        value: 3
+
+      health_rating:
+        source: null
+        kind: constant
+        value: 3
+
+      risk_tolerance:
+        source: null
+        kind: constant
+        value: 0
+
+      # Search count per user; orchestrator normalizes to events/week.
+      purchase_frequency:
+        source: derived_from_events
+        aggregator: count
+        group_by: customer_id
+
+      # Share of searches whose chosen property the user had not chosen
+      # before (state_features.compute_state_features adds `novelty`).
+      novelty_rate:
+        source: derived_from_events
+        aggregator: mean
+        aggregator_column: novelty
+        group_by: customer_id
+
+    # Domain phrasing for the purchase_frequency / novelty line of c_d.
+    c_d_extra_fields:
+      domain_verb:
+        kind: constant
+        value: "Searches for lodging on Expedia"
+      activity_noun:
+        kind: constant
+        value: "searches"
+      novelty_object:
+        kind: constant
+        value: "properties"
+      self_report_verb:
+        kind: constant
+        value: "Books stays"
+
+  training:
+    choice_set_size: 10        # J; must equal --J used at prepare time
+    n_resamples: 1
+    val_frac: 0.1
+    test_frac: 0.1
+    subsample:
+      enabled: false
+      n_customers: 100
+      seed: 42
+
+# Adapter-specific extras read by scripts/run_dataset.py (not part of the
+# frozen DatasetSchema).
+expedia_rectour:
+  impressions_path: expedia_rectour/data/impressions.csv
+  properties_path: expedia_rectour/data/properties.csv
+  slate_column: slate_prop_ids
+  search_id_column: search_id

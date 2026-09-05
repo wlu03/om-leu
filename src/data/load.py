@@ -8,7 +8,7 @@ to ``src/data/clean.py``. The only post-read work is calling
 schema/CSV mismatch surfaces immediately as an :class:`InvariantError`.
 
 The v1 module (``old_pipeline/src/data_prep.py``) used a
-module-level ``DATA_DIR = Path(__file__).parent.parent / "amazon_ecom"``
+module-level ``DATA_DIR = Path(__file__).parent.parent / "amazon/data"``
 side effect and ``print``-based stage reporting; both are dropped here.
 Paths are schema-driven (overridable per-call for fixture tests) and
 progress is reported via :mod:`logging`.

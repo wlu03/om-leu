@@ -50,7 +50,10 @@ from typing import Any, Callable, Mapping, Protocol, runtime_checkable
 from src.outcomes.prompts import (
     build_messages,
     build_messages_anchored,
+    build_messages_hotel_anchored,
     build_messages_mobility_anchored,
+    build_messages_modechoice_anchored,
+    build_messages_travel_anchored,
 )
 
 logger = logging.getLogger(__name__)
@@ -569,20 +572,57 @@ def _sanitize_model_id(model_id: str) -> str:
     return str(model_id).strip().replace("/", "_").lower()
 
 
+def _alt_hash(alt: Mapping[str, Any] | None) -> str | None:
+    """Stable 16-hex digest of the rendered alternative attributes.
+
+    The outcomes cache is keyed on ``(customer_id, asin, seed,
+    cache_prompt_version)``. Under Amazon every attribute of an ASIN is
+    per-ASIN constant, so ``asin`` alone identified the prompt's
+    ALTERNATIVE block. Real-slate datasets (Expedia price tier per search,
+    Swissmetro travel time / cost / headway per scenario) change the
+    block from event to event for the same ``(customer, asin)``; without
+    this digest the outcomes generated for one scenario's attributes were
+    silently reused for another (on Swissmetro 27,108 event-alternative
+    pairs collapsed into 21,867 keys, 2,086 of which mixed different
+    attribute sets). ``None`` when no ``alt`` is supplied (legacy callers).
+    """
+    if alt is None:
+        return None
+    try:
+        import json
+
+        payload = json.dumps(
+            {str(k): alt[k] for k in sorted(alt.keys(), key=str)},
+            sort_keys=True, default=str, ensure_ascii=False,
+        )
+    except TypeError:
+        payload = repr(sorted((str(k), str(v)) for k, v in alt.items()))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
 def build_cache_prompt_version(
-    prompt_version: str, K: int, model_id: str, c_d: str
+    prompt_version: str, K: int, model_id: str, c_d: str,
+    alt: Mapping[str, Any] | None = None,
 ) -> str:
     """Build the composite cache_prompt_version string.
 
     Public helper so cache-cascade logic (e.g. in
     :func:`src.data.batching.assemble_batch`) can compute the same composite
     key that :func:`generate_outcomes` writes under, without going through
-    the full generation path. Mirrors lines 681-685 of
-    :func:`generate_outcomes` exactly — keep these two in sync.
+    the full generation path. Keep in sync with :func:`generate_outcomes`.
+
+    ``alt`` (the rendered alternative dict that becomes the prompt's
+    ALTERNATIVE block) is folded in as ``-alt<hash>`` so per-event
+    alternative attributes get their own cache entries. Omitting ``alt``
+    reproduces the historical key (Amazon caches stay valid).
     """
     model_id_tag = _sanitize_model_id(model_id)
     cd_hash = hashlib.sha256(c_d.encode("utf-8")).hexdigest()[:16]
-    return f"{prompt_version}-K{int(K)}-{model_id_tag}-cd{cd_hash}"
+    key = f"{prompt_version}-K{int(K)}-{model_id_tag}-cd{cd_hash}"
+    ah = _alt_hash(alt)
+    if ah is not None:
+        key = f"{key}-alt{ah}"
+    return key
 
 
 def generate_outcomes(
@@ -707,6 +747,7 @@ def generate_outcomes(
         K=K,
         model_id=getattr(client, "model_id", "unknown"),
         c_d=c_d,
+        alt=alt,
     )
     # Re-derive the components for the debug log so the message is
     # unchanged from the pre-refactor era.
@@ -743,7 +784,13 @@ def generate_outcomes(
     # purpose/social/leisure). Both force K=5; the model gets one
     # outcome per M=5 head axis in canonical order.
     pv = str(prompt_version)
-    if pv.startswith("v4_mobility_anchored"):
+    if pv.startswith("v7_modechoice_anchored"):
+        messages = build_messages_modechoice_anchored(c_d=c_d, alt=alt, K=K)
+    elif pv.startswith("v6_travel_anchored"):
+        messages = build_messages_travel_anchored(c_d=c_d, alt=alt, K=K)
+    elif pv.startswith("v5_hotel_anchored"):
+        messages = build_messages_hotel_anchored(c_d=c_d, alt=alt, K=K)
+    elif pv.startswith("v4_mobility_anchored"):
         messages = build_messages_mobility_anchored(c_d=c_d, alt=alt, K=K)
     elif pv.startswith("v3_anchored"):
         messages = build_messages_anchored(c_d=c_d, alt=alt, K=K)

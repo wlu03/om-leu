@@ -7,7 +7,7 @@ the artifacts exist and are non-empty.
 Usage
 -----
 
-    python scripts/smoke_end_to_end.py [--reports-dir reports/smoke]
+    python scripts/smoke_end_to_end.py [--reports-dir amazon/results/smoke]
 
 No external data, no network calls. All stubs.
 """
@@ -131,6 +131,6 @@ def main(reports_dir: Path) -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--reports-dir", type=Path,
-                    default=REPO_ROOT / "reports" / "smoke")
+                    default=REPO_ROOT / "amazon" / "results" / "smoke")
     args = ap.parse_args()
     main(args.reports_dir)

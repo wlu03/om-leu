@@ -1,0 +1,148 @@
+# London Passenger Mode Choice (Hillel et al. 2018; CS_LPMC). One event per
+# trip; the chosen mode among walk | cycle | pt | drive, each with journey-
+# planner level-of-service attributes for that trip. Prepared by
+# scripts/prepare_lpmc.py into the generic mode-choice layout.
+#
+# Decision-maker = person; trips are timestamped, so the paper's per-person
+# chronological split applies. Use ``--min-events-per-customer 5``.
+
+dataset:
+  name: lpmc
+  description: >
+    LPMC, London 2012-2015: 81,086 trips by 31,954 people with four-mode
+    choice sets (walk, cycle, public transport, drive).
+
+  events:
+    path: lpmc/data/events.csv
+    parse_dates:
+      - timestamp
+    column_map:
+      person_id:       customer_id
+      timestamp:       order_date
+      alt_id:          asin
+      purpose_label:   category
+      cost_gbp:        price
+      alt_label:       title
+    dropna_subset:
+      - customer_id
+      - order_date
+      - asin
+    category_null_fill: "Unknown"
+    dtype_coerce:
+      price: float
+      customer_id: str
+      asin: str
+
+  persons:
+    path: lpmc/data/persons.csv
+    id_column: person_id
+
+    z_d_mapping:
+      age_bucket:
+        source: age_bucket
+        kind: categorical_map
+        values:
+          "18-24": "18-24"
+          "25-34": "25-34"
+          "35-44": "35-44"
+          "45-54": "45-54"
+          "55-64": "55-64"
+          "65+":   "65+"
+      # No income in LPMC; constant -> suppressed from c_d.
+      income_bucket:
+        source: null
+        kind: constant
+        value: "50-100k"
+      city_size:
+        source: null
+        kind: constant
+        value: "large"
+      household_size:
+        source: null
+        kind: constant
+        value: 2
+      has_kids:
+        source: null
+        kind: constant
+        value: 0
+      education:
+        source: null
+        kind: constant
+        value: 3
+      # Driving licence on the health slot is NOT semantically right; keep
+      # licence / car ownership in the profile lines and leave health constant.
+      health_rating:
+        source: null
+        kind: constant
+        value: 3
+      # No risk-attitude question; constant -> suppressed from c_d. Car
+      # ownership and the licence reach the generator via profile_lines.
+      risk_tolerance:
+        source: null
+        kind: constant
+        value: 0
+      purchase_frequency:
+        source: derived_from_events
+        aggregator: count
+        group_by: customer_id
+      novelty_rate:
+        source: derived_from_events
+        aggregator: mean
+        aggregator_column: novelty
+        group_by: customer_id
+
+    c_d_extra_fields:
+      gender:
+        source: gender_label
+        kind: passthrough
+      profile_lines:
+        source: profile_lines
+        kind: passthrough
+      domain_verb:
+        kind: constant
+        value: "Makes trips around London"
+      activity_noun:
+        kind: constant
+        value: "trips"
+      novelty_object:
+        kind: constant
+        value: "mode choices"
+      self_report_verb:
+        kind: constant
+        value: "Travels"
+      currency:
+        kind: constant
+        value: "GBP"
+      recent_label:
+        kind: constant
+        value: "Modes chosen on recent trips"
+      top_brand_label:
+        kind: constant
+        value: "Mode chosen most often so far"
+      top_categories_label:
+        kind: constant
+        value: "Most common trip purposes"
+      avg_price_label:
+        kind: constant
+        value: "Typical cost of the option they pick"
+      repeat_rate_label:
+        kind: constant
+        value: "of their choices repeat a mode they had already picked"
+
+  training:
+    choice_set_size: 4         # J: walk | cycle | pt | drive
+    n_resamples: 1
+    val_frac: 0.15
+    test_frac: 0.15
+    subsample:
+      enabled: false
+      n_customers: 100
+      seed: 42
+
+modechoice:
+  impressions_path: lpmc/data/impressions.csv
+  properties_path: lpmc/data/properties.csv
+  slate_column: slate_alt_ids
+  event_id_column: event_id
+  currency: GBP
+  phrase_column: trip_phrase

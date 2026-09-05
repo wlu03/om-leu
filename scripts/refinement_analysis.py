@@ -22,9 +22,9 @@ Output goes to ``<output-dir>/refinement_analysis.{md,json}``.
 Usage::
 
     python -m scripts.refinement_analysis \\
-        --baseline-glob "results_data/poleu_*cust_seed*_no_residual" \\
-        --refined-glob  "results_data/poleu_*cust_seed*_refined" \\
-        --output-dir    results_data/refinement_analysis
+        --baseline-glob "amazon/results/poleu_*cust_seed*_no_residual" \\
+        --refined-glob  "amazon/results/poleu_*cust_seed*_refined" \\
+        --output-dir    amazon/results/refinement_analysis
 
 Both globs are matched independently; pairs are joined by the seed token
 extracted from each run-dir name (``..._seedN_...``).

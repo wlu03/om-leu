@@ -19,9 +19,9 @@ critic scores so the experiment is auditable without re-querying the cache.
 Usage::
 
     python -m scripts.refine_outcomes \\
-        --failure-events results_data/poleu_50cust_seed7_no_residual/failure_events.json \\
-        --outcomes-cache outcomes_cache/outcomes.sqlite \\
-        --output results_data/poleu_50cust_seed7_no_residual/refined_outcomes.json \\
+        --failure-events amazon/results/poleu_50cust_seed7_no_residual/failure_events.json \\
+        --outcomes-cache amazon/cache/outcomes.sqlite \\
+        --output amazon/results/poleu_50cust_seed7_no_residual/refined_outcomes.json \\
         --writer anthropic --critic openai
 
 The downstream :mod:`scripts.run_dataset` invocation must pass
@@ -62,8 +62,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--outcomes-cache",
         type=Path,
-        default=Path("outcomes_cache/outcomes.sqlite"),
-        help="Path to the SQLite outcomes cache. Default outcomes_cache/outcomes.sqlite.",
+        default=Path("amazon/cache/outcomes.sqlite"),
+        help="Path to the SQLite outcomes cache. Default amazon/cache/outcomes.sqlite.",
     )
     p.add_argument(
         "--K", type=int, default=3,

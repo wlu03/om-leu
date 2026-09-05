@@ -5,10 +5,10 @@
 # (configs/higher_beta.yaml + --residual-lr-multiplier override).
 #
 # Single-seed for now: only seed 7 has a fully populated outcomes cache
-# under outcomes_cache/mobility_v4/. To extend to 3 seeds we'd need
+# under mobility_boston/cache/mobility_v4/. To extend to 3 seeds we'd need
 # cold runs for seeds 11/13 (~$15-30 + ~30 min each at concurrency 32).
 #
-# Outputs land at results_data/abl_lrmult_mobility/x{M}/ — same shape
+# Outputs land at mobility_boston/results/abl_lrmult_mobility/x{M}/ — same shape
 # as the Amazon ablation outputs so the analysis-script layout
 # carries over.
 
@@ -25,8 +25,8 @@ set +a
 # 100% cache miss + ~hours of LLM credit per cell.
 export ANTHROPIC_MODEL=claude-sonnet-4-6
 export PYTHONUNBUFFERED=1
-export OUTCOMES_CACHE_PATH="outcomes_cache/mobility_v4/outcomes.sqlite"
-export EMBEDDINGS_CACHE_PATH="embeddings_cache/mobility_v4/embeddings.sqlite"
+export OUTCOMES_CACHE_PATH="mobility_boston/cache/mobility_v4/outcomes.sqlite"
+export EMBEDDINGS_CACHE_PATH="mobility_boston/cache/mobility_v4/embeddings.sqlite"
 
 # Drop stray Vertex env vars (irrelevant for this run, but the v4
 # launcher pattern always unsets them).
@@ -34,14 +34,14 @@ unset GOOGLE_GENAI_USE_VERTEXAI
 unset GOOGLE_CLOUD_PROJECT
 unset GOOGLE_CLOUD_LOCATION
 
-OUT_ROOT="results_data/abl_lrmult_mobility"
+OUT_ROOT="mobility_boston/results/abl_lrmult_mobility"
 mkdir -p "${OUT_ROOT}"
 
 # Records source: leak-corrected v4 residual run on mobility seed 7.
 # Has the per-(event, alt) symmetric distance prices baked into
 # alt_texts via build_choice_sets, so the residual reads non-leaky x_tab.
 SEED=7
-RECORDS="reports/mobility_boston_real_v4_residual/records.pkl"
+RECORDS="mobility_boston/results/mobility_boston_real_v4_residual/records.pkl"
 if [ ! -f "${RECORDS}" ]; then
   echo "FATAL: ${RECORDS} not found — run the v4 residual driver first."
   exit 2

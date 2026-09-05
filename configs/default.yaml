@@ -83,8 +83,8 @@ outcomes:
     cos_sim_threshold: 0.9
     max_retries: 2
   cache:
-    outcomes_path: "outcomes_cache/outcomes.sqlite"
-    embeddings_path: "embeddings_cache/embeddings.sqlite"
+    outcomes_path: null   # null -> <adapter>/cache/outcomes.sqlite
+    embeddings_path: null   # null -> <adapter>/cache/embeddings.sqlite
 
 # Opt-in K=5 anchored prompts (one outcome per M=5 head axis). Requires cache regen via scripts/run_dataset.py --prompt-version-cascade v3_anchored v2.
 outcomes_anchored:
@@ -117,6 +117,10 @@ regularizers:
     sign_hidden: 16
   diversity: 1.0e-4          # §9.2 λ_div
   head_variance: 1.0e-2      # anti-dead-head pull on per-head score variance (subtract to maximize). 0.0 = legacy.
+  # Diagonal head/slot alignment for anchored (K == M) prompts: cross-entropy
+  # pulling head m toward outcome slot m. 0.0 = legacy (heads free to
+  # collapse into copies of one another); see configs/head_aligned.yaml.
+  head_alignment: 0.0
 
 eval:
   top_k_list: [1, 5]
@@ -136,7 +140,7 @@ subsample:
   seed: 42
 
 paths:
-  outcomes_cache: "outcomes_cache/"
-  embeddings_cache: "embeddings_cache/"
-  checkpoints: "checkpoints/"
-  reports: "reports/"
+  outcomes_cache: null   # null -> <adapter>/cache/
+  embeddings_cache: null
+  checkpoints: null   # null -> <adapter>/results/
+  reports: null   # null -> <adapter>/results/

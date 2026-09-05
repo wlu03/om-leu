@@ -1,9 +1,9 @@
 """Aggregate the mobility residual_lr_multiplier ablation outputs.
 
 Reads:
-  - results_data/abl_lrmult_mobility/x{M}/metrics_test.json       — top1/NLL/...
-  - results_data/abl_lrmult_mobility/x{M}/test_logits.npz         — V+R logits
-  - results_data/abl_lrmult_mobility/x0_no_residual/test_logits.npz — V baseline
+  - mobility_boston/results/abl_lrmult_mobility/x{M}/metrics_test.json       — top1/NLL/...
+  - mobility_boston/results/abl_lrmult_mobility/x{M}/test_logits.npz         — V+R logits
+  - mobility_boston/results/abl_lrmult_mobility/x0_no_residual/test_logits.npz — V baseline
 
 Produces:
   - per-multiplier metrics table  (top1, top3, top5, NLL, ECE, R²)
@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-ABL_ROOT = REPO_ROOT / "results_data" / "abl_lrmult_mobility"
+ABL_ROOT = REPO_ROOT / "mobility_boston" / "results" / "abl_lrmult_mobility"
 MULTIPLIERS = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 30)
 
 
@@ -45,7 +45,7 @@ def _v_baseline_path() -> Path:
     p1 = ABL_ROOT / "x0_no_residual" / "test_logits.npz"
     if p1.exists():
         return p1
-    return REPO_ROOT / "reports" / "mobility_boston_real_v4_no_residual" / "test_logits.npz"
+    return REPO_ROOT / "mobility_boston" / "results" / "mobility_boston_real_v4_no_residual" / "test_logits.npz"
 
 
 def main() -> int:

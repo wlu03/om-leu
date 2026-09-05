@@ -37,6 +37,11 @@ _SUPPRESSIBLE_FIELDS: frozenset[str] = frozenset({
     "education",
     "health_rating",
     "risk_tolerance",
+    # Datasets with no demographics at all (Expedia RecTour) declare
+    # age / income as constants; rendering a fabricated "Age: mid-30s"
+    # line would mislead the generator, so these are suppressible too.
+    "age_bucket",
+    "income_bucket",
 })
 
 __all__ = [
@@ -396,8 +401,15 @@ def build_context_string(
     suppress_fields: Iterable[str] = (),
     extra_fields: Mapping[str, Any] | None = None,
     event_origin: str | None = None,
+    event_context: str | None = None,
 ) -> str:
     """Render the person-context paragraph ``c_d``.
+
+    ``event_context`` is an optional per-event phrase describing the
+    decision situation itself (for lodging search: the trip being
+    booked — dates, party, length of stay, lead time). Rendered as a
+    ``"- This trip: ..."`` line. It is strictly pre-decision information
+    (search parameters), never the outcome.
 
     Parameters
     ----------
@@ -463,6 +475,9 @@ def build_context_string(
     # --- phrasings -------------------------------------------------------
     age_phrase = _phrase_age(row["age_bucket"])
     income_phrase = _phrase_income(row["income_bucket"])
+    if extras.get("currency"):
+        # Non-USD datasets: "about $73k/year" -> "about CHF 73k/year".
+        income_phrase = income_phrase.replace("$", f"{extras['currency']} ")
     freq_phrase = _phrase_purchase_frequency(row["purchase_frequency"])
     novelty_phrase = _phrase_novelty(row["novelty_rate"])
     household_size = int(row["household_size"])
@@ -493,20 +508,20 @@ def build_context_string(
     gender_suffix = ""
     if extras.get("gender"):
         gender_suffix = f", as a {extras['gender']}"
+    age_prefix = "" if "age_bucket" in suppress else f"Age: {age_phrase}; "
     if "has_kids" in suppress:
-        lines.append(
-            f"- Age: {age_phrase}; household of {household_size}"
-            f"{gender_suffix}."
-        )
+        body = f"{age_prefix}household of {household_size}{gender_suffix}."
     else:
         kids_phrase = _phrase_kids(bool(row["has_kids"]), household_size)
-        lines.append(
-            f"- Age: {age_phrase}; household of {household_size} "
+        body = (
+            f"{age_prefix}household of {household_size} "
             f"({kids_phrase}){gender_suffix}."
         )
+    lines.append(f"- {body[:1].upper()}{body[1:]}")
 
-    # Line 3: income (not suppressible).
-    lines.append(f"- Income: {income_phrase}.")
+    # Line 3: income (suppressible only for demographics-free datasets).
+    if "income_bucket" not in suppress:
+        lines.append(f"- Income: {income_phrase}.")
 
     # Wave-11 extra: Recent life event line, right after income.
     if extras.get("life_event"):
@@ -561,31 +576,36 @@ def build_context_string(
     # The encoder cannot otherwise see brand affinity / category density
     # / typical price tier — these clauses give it that signal.
     if extras.get("top_brand"):
-        lines.append(
-            f"- Most-purchased brand in their history: {extras['top_brand']}."
-        )
+        label = extras.get("top_brand_label") or "Most-purchased brand in their history"
+        lines.append(f"- {label}: {extras['top_brand']}.")
     if extras.get("top_categories"):
         cats = extras["top_categories"]
         if isinstance(cats, (list, tuple)) and cats:
             joined = ", ".join(str(c) for c in cats[:3])
-            lines.append(f"- Top categories they shop: {joined}.")
+            label = extras.get("top_categories_label") or "Top categories they shop"
+            lines.append(f"- {label}: {joined}.")
     if extras.get("avg_price") is not None:
         try:
             ap = float(extras["avg_price"])
             if ap > 0.0:
-                lines.append(
-                    f"- Typical purchase price: about ${ap:.0f}."
-                )
+                label = extras.get("avg_price_label") or "Typical purchase price"
+                cur = extras.get("currency")
+                # Sub-10 amounts (bus fares, fuel for a short trip) would
+                # round to "0"; keep two decimals there.
+                amt = f"{ap:.2f}" if (cur and ap < 10.0) else f"{ap:.0f}"
+                amount = f"{cur} {amt}" if cur else f"${ap:.0f}"
+                lines.append(f"- {label}: about {amount}.")
         except (TypeError, ValueError):
             pass
     if extras.get("repeat_rate") is not None:
         try:
             rr = float(extras["repeat_rate"])
             if 0.0 <= rr <= 1.0:
-                lines.append(
-                    f"- About {int(round(100 * rr))}% of their purchases "
-                    f"are repeats of items they have bought before."
+                tail = (
+                    extras.get("repeat_rate_label")
+                    or "of their purchases are repeats of items they have bought before"
                 )
+                lines.append(f"- About {int(round(100 * rr))}% {tail}.")
         except (TypeError, ValueError):
             pass
 
@@ -617,7 +637,79 @@ def build_context_string(
             f"- Most active during the {extras['daypart_preference']}."
         )
 
+    # Lodging-search profile aggregates (computed by
+    # :func:`compute_hotel_aggregates`). Adapter-agnostic — other
+    # datasets don't populate these so the lines silently drop.
+    hotel_bits: list[str] = []
+    if extras.get("typical_star_rating") is not None:
+        try:
+            sr = float(extras["typical_star_rating"])
+            if sr > 0.0:
+                hotel_bits.append(f"usually books around {sr:.1f}-star properties")
+        except (TypeError, ValueError):
+            pass
+    if extras.get("typical_price_tier") is not None:
+        try:
+            pt = float(extras["typical_price_tier"])
+            if 1.0 <= pt <= 5.0:
+                tier_word = (
+                    "the cheapest" if pt < 1.75 else
+                    "budget" if pt < 2.5 else
+                    "mid-priced" if pt < 3.5 else
+                    "upper-mid" if pt < 4.25 else
+                    "the priciest"
+                )
+                hotel_bits.append(f"tends to pick {tier_word} options shown")
+        except (TypeError, ValueError):
+            pass
+    if hotel_bits:
+        joined_bits = "; ".join(hotel_bits)
+        lines.append(f"- {joined_bits[:1].upper()}{joined_bits[1:]}.")
+    trip_bits: list[str] = []
+    if extras.get("typical_stay_nights") is not None:
+        try:
+            sn = float(extras["typical_stay_nights"])
+            if sn > 0.0:
+                trip_bits.append(f"stays of about {sn:.0f} night{'s' if sn >= 1.5 else ''}")
+        except (TypeError, ValueError):
+            pass
+    if extras.get("typical_party_size") is not None:
+        try:
+            ps = float(extras["typical_party_size"])
+            if ps >= 1.0:
+                trip_bits.append(
+                    "travels alone" if ps < 1.5 else
+                    "travels as a pair" if ps < 2.5 else
+                    f"travels in a party of about {ps:.0f}"
+                )
+        except (TypeError, ValueError):
+            pass
+    if extras.get("typical_lead_days") is not None:
+        try:
+            ld = float(extras["typical_lead_days"])
+            if ld >= 0.0:
+                trip_bits.append(
+                    "books last-minute" if ld < 3 else
+                    "books about a week ahead" if ld < 14 else
+                    "books a few weeks ahead" if ld < 45 else
+                    "plans well in advance"
+                )
+        except (TypeError, ValueError):
+            pass
+    if trip_bits:
+        joined_trip = "; ".join(trip_bits)
+        lines.append(f"- Typically {joined_trip}.")
+
+    # Free-form profile lines supplied by the dataset adapter (at most 4).
+    for pline in extras.get("profile_lines") or []:
+        lines.append(f"- {pline[:1].upper()}{pline[1:]}.")
+
     # --- optional lines --------------------------------------------------
+    if event_context:
+        # Per-event decision situation (lodging: the trip being booked).
+        # Search parameters only — strictly pre-decision information.
+        lines.append(f"- This trip: {event_context}.")
+
     if event_origin:
         # Per-event origin context — for mobility this renders where the
         # agent is coming from ("home" / "their workplace" / "a Food and
@@ -628,7 +720,8 @@ def build_context_string(
 
     if recent_purchases:
         joined = ", ".join(str(p) for p in recent_purchases)
-        lines.append(f"Recent purchases (last 30 days): {joined}.")
+        recent_label = extras.get("recent_label") or "Recent purchases"
+        lines.append(f"{recent_label} (last 30 days): {joined}.")
 
     if current_time:
         lines.append(f"Current time: {current_time}.")
@@ -645,10 +738,12 @@ def build_context_string(
     # customer-aggregate enrichment (top_brand, top_categories,
     # avg_price, repeat_rate) +4, and the two optional lines (recent /
     # current_time) +2 — hence the relaxed ceiling of 16.
+    # The hotel-aggregate lines (+2), the per-event trip line (+1) and up
+    # to 4 adapter profile lines raise the ceiling to 23.
     n_lines = sum(1 for ln in text.split("\n") if ln.strip())
-    if not 2 <= n_lines <= 16:
+    if not 2 <= n_lines <= 23:
         raise AssertionError(
-            f"context string has {n_lines} non-empty lines; expected 2-16"
+            f"context string has {n_lines} non-empty lines; expected 2-23"
         )
     if n_lines < 5:
         logger.warning(
@@ -765,18 +860,44 @@ def _normalize_extra_fields(
     for key in (
         "top_brand", "top_categories", "avg_price", "repeat_rate",
         "typical_distance_km", "weekend_share", "daypart_preference",
+        "typical_star_rating", "typical_price_tier", "typical_stay_nights",
+        "typical_party_size", "typical_lead_days",
     ):
         val = extra_fields.get(key)
         if not _is_missing(val):
             out[key] = val
 
+    # Dataset-supplied free-form profile lines (already paraphrased by the
+    # adapter's prepare step, e.g. "Holds an annual rail season ticket").
+    # Rendered verbatim as "- <line>." after the domain lines.
+    pl = extra_fields.get("profile_lines")
+    if isinstance(pl, (list, tuple)):
+        cleaned = [str(x).strip().rstrip(".") for x in pl if not _is_missing(x) and str(x).strip()]
+        if cleaned:
+            out["profile_lines"] = cleaned[:4]
+    elif isinstance(pl, str) and pl.strip():
+        out["profile_lines"] = [
+            s.strip().rstrip(".") for s in pl.split("|") if s.strip()
+        ][:4]
+
     # Domain-override knobs — strings substituted directly into the
     # purchase_frequency/novelty line. Pass through unchanged when present.
+    # ``currency`` swaps the "$" in the income phrase (e.g. "CHF");
+    # ``recent_label`` replaces the "Recent purchases" lead-in.
     for key in (
         "domain_verb",
         "activity_noun",
         "novelty_object",
         "self_report_verb",
+        "currency",
+        "recent_label",
+        # Labels for the customer-aggregate enrichment lines (defaults are
+        # Amazon-flavoured: "Most-purchased brand", "Top categories they
+        # shop", "Typical purchase price", "... purchases are repeats").
+        "top_brand_label",
+        "top_categories_label",
+        "avg_price_label",
+        "repeat_rate_label",
     ):
         val = extra_fields.get(key)
         if not _is_missing(val):
@@ -1003,6 +1124,72 @@ def compute_mobility_aggregates(
                 counts = dayparts.value_counts()
                 if not counts.empty:
                     agg["daypart_preference"] = str(counts.index[0])
+        out[cid] = agg
+    return out
+
+
+def compute_hotel_aggregates(
+    events_df, *, train_only: bool = True
+) -> dict:
+    """Per-customer lodging-search summary stats for c_d enrichment.
+
+    Returns ``dict[customer_id, agg]`` with keys (each only when the
+    source column is present and non-empty for that customer):
+
+    * ``typical_star_rating`` (float) — mean star rating of the chosen
+      properties (``chosen_star_rating`` column).
+    * ``typical_price_tier`` (float in [1, 5]) — mean price tier of the
+      chosen properties (``price`` column = price bucket).
+    * ``typical_stay_nights`` (float) — median ``length_of_stay``.
+    * ``typical_party_size`` (float) — mean ``adult_count + child_count``.
+    * ``typical_lead_days`` (float) — median ``booking_window``.
+
+    ``train_only=True`` filters by ``events_df["split"] == "train"`` when
+    present, so held-out events are rendered under the same train-fit
+    summary the model saw during training (no val/test leakage).
+    """
+    import pandas as _pd  # noqa: PLC0415 — keep module light-weight
+
+    df = events_df
+    if train_only and "split" in df.columns:
+        df = df[df["split"] == "train"]
+    if df.empty:
+        return {}
+
+    out: dict[object, dict] = {}
+    for cid, group in df.groupby("customer_id", sort=False):
+        agg: dict = {}
+        if "chosen_star_rating" in group.columns:
+            s = _pd.to_numeric(group["chosen_star_rating"], errors="coerce")
+            s = s[s > 0]
+            if not s.empty:
+                agg["typical_star_rating"] = float(s.mean())
+        if "price" in group.columns:
+            p = _pd.to_numeric(group["price"], errors="coerce")
+            p = p[(p >= 1) & (p <= 5)]
+            if not p.empty:
+                agg["typical_price_tier"] = float(p.mean())
+        if "length_of_stay" in group.columns:
+            n = _pd.to_numeric(group["length_of_stay"], errors="coerce").dropna()
+            n = n[n > 0]
+            if not n.empty:
+                agg["typical_stay_nights"] = float(n.median())
+        if "adult_count" in group.columns:
+            adults = _pd.to_numeric(group["adult_count"], errors="coerce").fillna(0)
+            kids = (
+                _pd.to_numeric(group["child_count"], errors="coerce").fillna(0)
+                if "child_count" in group.columns
+                else 0
+            )
+            party = adults + kids
+            party = party[party >= 1]
+            if not party.empty:
+                agg["typical_party_size"] = float(party.mean())
+        if "booking_window" in group.columns:
+            bw = _pd.to_numeric(group["booking_window"], errors="coerce").dropna()
+            bw = bw[bw >= 0]
+            if not bw.empty:
+                agg["typical_lead_days"] = float(bw.median())
         out[cid] = agg
     return out
 

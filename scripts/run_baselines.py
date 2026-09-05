@@ -326,6 +326,26 @@ def _external_row(
     em = compute_all(
         logits, c_star, n_params=n_params, n_train=int(train_n_events)
     )
+
+    # Per-event instrumentation, computed with the same formulas as
+    # ``src.baselines.evaluate.evaluate_baseline`` so the external row is
+    # a first-class citizen for scripts/paired_significance.py (paired
+    # bootstrap / Wilcoxon / McNemar need per-event NLL and top-1 arrays).
+    logits_f64 = np.asarray(logits, dtype=np.float64)
+    shifted = logits_f64 - logits_f64.max(axis=1, keepdims=True)
+    log_probs = shifted - np.log(np.exp(shifted).sum(axis=1, keepdims=True))
+    per_event_nll_arr = -log_probs[np.arange(len(npz_c_star)), npz_c_star]
+    per_event_topk_correct = [
+        bool(v) for v in (np.argmax(logits_f64, axis=-1) == npz_c_star)
+    ]
+    per_customer_nll: dict[str, float] = {}
+    customer_ids = getattr(test_batch, "customer_ids", None)
+    if customer_ids is not None and len(customer_ids) == len(per_event_nll_arr):
+        sums: dict[str, list[float]] = {}
+        for cid, v in zip(customer_ids, per_event_nll_arr):
+            sums.setdefault(str(cid), []).append(float(v))
+        per_customer_nll = {c: float(np.mean(v)) for c, v in sums.items()}
+
     return {
         "name": name,
         "status": "ok",
@@ -341,6 +361,9 @@ def _external_row(
         "fit_seconds": 0.0,
         "description": f"{name} artifact {Path(logits_path).name}",
         "error": None,
+        "per_event_nll": [float(v) for v in per_event_nll_arr],
+        "per_event_topk_correct": per_event_topk_correct,
+        "per_customer_nll": per_customer_nll,
     }
 
 

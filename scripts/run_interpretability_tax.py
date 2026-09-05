@@ -11,8 +11,8 @@ Usage
 -----
 
     python scripts/run_interpretability_tax.py \\
-        --records-from reports/records_roundtrip_seed99 \\
-        --output-dir   reports/interp_tax_A7_seed99 \\
+        --records-from amazon/results/records_roundtrip_seed99 \\
+        --output-dir   amazon/results/interp_tax_A7_seed99 \\
         --n-epochs 30 --batch-size 32 --seed 99
 
 The records.pkl path is the *directory* of an A0 run (or a path ending in
@@ -111,8 +111,8 @@ def main() -> int:
         model_id="sentence-transformers/all-mpnet-base-v2",
         max_length=64, pooling="mean",
     )
-    outcomes_cache = OutcomesCache(REPO_ROOT / "outcomes_cache/outcomes.sqlite")
-    embeddings_cache = EmbeddingsCache(REPO_ROOT / "embeddings_cache/embeddings.sqlite")
+    outcomes_cache = OutcomesCache(REPO_ROOT / "amazon/cache/outcomes.sqlite")
+    embeddings_cache = EmbeddingsCache(REPO_ROOT / "amazon/cache/embeddings.sqlite")
     div_filter = _default_div_filter
 
     # ---- 3. assemble batches (cache hits for the A0 slice) -------------

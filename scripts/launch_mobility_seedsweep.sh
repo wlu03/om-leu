@@ -17,7 +17,7 @@
 #   Ctrl-b w         list windows
 #   Ctrl-b d         detach (runs keep going)
 #
-# Each window's command is also written to reports/seed_<seed>_<model>/run.cmd
+# Each window's command is also written to mobility_boston/results/seed_<seed>_<model>/run.cmd
 # so it can be re-launched manually if a window dies.
 
 set -e
@@ -56,9 +56,9 @@ for entry in "${SWEEP[@]}"; do
   IFS='|' read -r SEED PROVIDER MODEL <<<"$entry"
   TAG="seed_${SEED}_${MODEL}"
   WIN="${PROVIDER:0:3}${SEED}_${MODEL}"
-  OUT_DIR="reports/${TAG}"
-  CACHE_DIR_O="outcomes_cache/${TAG}"
-  CACHE_DIR_E="embeddings_cache/${TAG}"
+  OUT_DIR="mobility_boston/results/${TAG}"
+  CACHE_DIR_O="mobility_boston/cache/${TAG}"
+  CACHE_DIR_E="mobility_boston/cache/${TAG}"
   LOG_PATH="${OUT_DIR}/run.log"
   CMD_PATH="${OUT_DIR}/run.cmd"
 
@@ -115,9 +115,9 @@ Launched 6-window tmux session: $SESSION
   - 3× Gemini-3-Flash-Preview seeds (0, 1, 2)
   - 3× o4-mini seeds (0, 1, 2)
 
-Each window's logs:    reports/seed_<seed>_<model>/run.log
-Each window's command: reports/seed_<seed>_<model>/run.cmd
-Each window's outputs: reports/seed_<seed>_<model>/
+Each window's logs:    mobility_boston/results/seed_<seed>_<model>/run.log
+Each window's command: mobility_boston/results/seed_<seed>_<model>/run.cmd
+Each window's outputs: mobility_boston/results/seed_<seed>_<model>/
 
 Attach with:
   tmux attach -t $SESSION

@@ -13,7 +13,7 @@ Usage
 
     python scripts/smoke_mobility_boston.py [--n-customers 30] [--n-epochs 1]
 
-Writes a smoke_summary.json into reports/mobility_boston_stub/ with
+Writes a smoke_summary.json into mobility_boston/results/stub/ with
 structural counts and untrained metrics (the latter approximate random
 chance because stub embeddings carry no preference signal).
 """
@@ -44,7 +44,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--dataset-yaml", type=Path,
                    default=REPO_ROOT / "configs" / "datasets" / "mobility_boston.yaml")
     p.add_argument("--output-dir", type=Path,
-                   default=REPO_ROOT / "reports" / "mobility_boston_stub")
+                   default=REPO_ROOT / "mobility_boston" / "results" / "stub")
     p.add_argument("--n-customers", type=int, default=30)
     p.add_argument("--n-epochs", type=int, default=1)
     p.add_argument("--batch-size", type=int, default=16)
@@ -165,7 +165,7 @@ def main(args: argparse.Namespace) -> int:
     # computed as haversine(event.from_cbg, alt.typical_to_cbg). Same
     # formula for chosen and negatives, fit on train rows only.
     from src.data.mobility_geodistance import make_per_event_alt_overrides_fn
-    centroid_path = REPO_ROOT / "mobility_trajectory_boston" / (
+    centroid_path = REPO_ROOT / "mobility_boston" / "data" / (
         "Basic_Geographic_Statistics_CBG_Boston.csv"
     )
     overrides_fn = make_per_event_alt_overrides_fn(events, centroid_path)

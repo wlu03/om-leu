@@ -20,7 +20,7 @@ Usage
         --n-customers 100 \\
         --n-epochs 1 \\
         --batch-size 32 \\
-        --output-dir reports/amazon_smoke
+        --output-dir amazon/results/smoke
 
 Requires the ``ANTHROPIC_API_KEY`` environment variable and the
 ``anthropic`` + ``sentence-transformers`` packages to be installed.
@@ -78,7 +78,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--adapter",
         required=True,
-        choices=["amazon", "synthetic", "mobility_boston"],
+        choices=["amazon", "synthetic", "mobility_boston", "expedia_rectour",
+                 "swissmetro", "optima", "lpmc"],
         help="Dataset adapter name. 'synthetic' requires an explicit "
              "--dataset-config (no built-in synthetic YAML ships).",
     )
@@ -123,7 +124,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--output-dir",
         type=Path,
         default=None,
-        help="Directory for reports; defaults to reports/<adapter>_<timestamp>.",
+        help="Directory for reports; defaults to <adapter>/results/<timestamp>.",
     )
     parser.add_argument(
         "--K",
@@ -274,15 +275,52 @@ def _resolve_dataset_config(args: argparse.Namespace) -> Path:
     return REPO_ROOT / "configs" / "datasets" / f"{args.adapter}.yaml"
 
 
+def _dataset_root(adapter: str) -> Path:
+    """``<repo>/<adapter>/`` — every dataset owns ``data/``, ``results/``
+    and ``cache/`` under its own top-level directory."""
+    return REPO_ROOT / str(adapter)
+
+
 def _resolve_output_dir(args: argparse.Namespace) -> Path:
-    """Resolve the output dir, defaulting to reports/<adapter>_<ts>."""
+    """Resolve the output dir, defaulting to <adapter>/results/<ts>."""
     if args.output_dir is not None:
         out = Path(args.output_dir)
     else:
         ts = time.strftime("%Y%m%d_%H%M%S")
-        out = REPO_ROOT / "reports" / f"{args.adapter}_{ts}"
+        out = _dataset_root(args.adapter) / "results" / ts
     out.mkdir(parents=True, exist_ok=True)
     return out
+
+
+def _resolve_cache_paths(args: argparse.Namespace, config: dict) -> tuple[Path, Path]:
+    """Outcomes / embeddings sqlite paths.
+
+    Precedence: ``OUTCOMES_CACHE_PATH`` / ``EMBEDDINGS_CACHE_PATH`` env
+    vars, then explicit ``outcomes.cache.*_path`` in the config, then
+    ``paths.*_cache`` roots, then the dataset default
+    ``<adapter>/cache/{outcomes,embeddings}.sqlite``. ``null`` in the
+    YAML means "dataset default".
+    """
+    paths_cfg = config.get("paths") or {}
+    cache_cfg = (config.get("outcomes") or {}).get("cache") or {}
+    root = _dataset_root(args.adapter) / "cache"
+
+    def _one(env_name: str, cfg_key: str, root_key: str, fname: str) -> Path:
+        env_val = os.environ.get(env_name, "").strip()
+        if env_val:
+            p = Path(env_val)
+        elif cache_cfg.get(cfg_key):
+            p = Path(str(cache_cfg[cfg_key]))
+        elif paths_cfg.get(root_key):
+            p = Path(str(paths_cfg[root_key])) / fname
+        else:
+            p = root / fname
+        return p if p.is_absolute() else REPO_ROOT / p
+
+    return (
+        _one("OUTCOMES_CACHE_PATH", "outcomes_path", "outcomes_cache", "outcomes.sqlite"),
+        _one("EMBEDDINGS_CACHE_PATH", "embeddings_path", "embeddings_cache", "embeddings.sqlite"),
+    )
 
 
 def _load_yaml(path: Path) -> dict:
@@ -365,6 +403,18 @@ def _build_llm_and_encoder(args: argparse.Namespace, config: dict) -> tuple[Any,
       ``gemini-2.5-flash``) controls the model id.
     * ``LLM_PROVIDER=openai``. Reads ``OPENAI_API_KEY``;
       ``OPENAI_MODEL`` (default ``gpt-5``) controls the model id.
+    * ``LLM_PROVIDER=openai_compatible``. Any OpenAI-compatible server
+      (vLLM, llama.cpp, LM Studio, TGI ...). Reads ``OPENAI_BASE_URL``
+      (required) and ``OPENAI_MODEL``; ``OPENAI_API_KEY`` is optional.
+      ``OPENAI_EXTRA_BODY`` (JSON) is forwarded verbatim, e.g.
+      ``{"chat_template_kwargs": {"enable_thinking": false}}`` for Qwen3.
+    * ``LLM_PROVIDER=ollama``. Local Ollama; ``OLLAMA_BASE_URL`` (default
+      ``http://localhost:11434``) and ``OLLAMA_MODEL`` (default ``llama3.3``).
+      Routed through the same OpenAI-compatible client at ``/v1``.
+
+    Open-weight model ids are namespaced in the cache key (``model_id`` is
+    folded into ``build_cache_prompt_version``), so a local model and a
+    hosted one never collide.
 
     The driver is real-only: stubs used to live behind a ``--stub-llm``
     flag but shared the outcomes-cache key schema with real calls, which
@@ -444,10 +494,49 @@ def _build_llm_and_encoder(args: argparse.Namespace, config: dict) -> tuple[Any,
         model_id = os.environ.get("OPENAI_MODEL", "gpt-5")
         llm_client = OpenAILLMClient(model_id=model_id, api_key=api_key)
 
+    elif provider in ("openai_compatible", "ollama"):
+        try:
+            import openai  # noqa: F401  # type: ignore[import-not-found]
+        except ImportError:
+            sys.stderr.write("run_dataset.py: install `openai`.\n")
+            sys.exit(2)
+        from src.outcomes._openai_client import OpenAILLMClient
+        if provider == "ollama":
+            base_url = os.environ.get(
+                "OLLAMA_BASE_URL", "http://localhost:11434"
+            ).rstrip("/")
+            if not base_url.endswith("/v1"):
+                base_url = base_url + "/v1"
+            model_id = os.environ.get("OLLAMA_MODEL", "llama3.3")
+        else:
+            base_url = os.environ.get("OPENAI_BASE_URL", "").strip()
+            if not base_url:
+                sys.stderr.write(
+                    "run_dataset.py: LLM_PROVIDER=openai_compatible requires "
+                    "OPENAI_BASE_URL (e.g. http://localhost:8000/v1).\n"
+                )
+                sys.exit(2)
+            model_id = os.environ.get("OPENAI_MODEL", "").strip()
+            if not model_id:
+                sys.stderr.write(
+                    "run_dataset.py: LLM_PROVIDER=openai_compatible requires "
+                    "OPENAI_MODEL (the served model id).\n"
+                )
+                sys.exit(2)
+        extra_body_raw = os.environ.get("OPENAI_EXTRA_BODY", "").strip()
+        extra_body = json.loads(extra_body_raw) if extra_body_raw else None
+        llm_client = OpenAILLMClient(
+            model_id=model_id,
+            api_key=os.environ.get("OPENAI_API_KEY") or "not-needed",
+            base_url=base_url,
+            extra_body=extra_body,
+        )
+
     else:
         sys.stderr.write(
             f"run_dataset.py: LLM_PROVIDER={provider!r} unrecognised "
-            f"(expected one of: anthropic, gemini, openai).\n"
+            f"(expected one of: anthropic, gemini, openai, openai_compatible, "
+            f"ollama).\n"
         )
         sys.exit(2)
 
@@ -859,7 +948,14 @@ def _run_pipeline_once(args: argparse.Namespace) -> int:
     # into c_d by the new clauses in build_context_string. Keeps existing
     # Wave-11 fields (gender / life_event / amazon_frequency) — agg keys
     # use distinct names so they cannot collide.
-    data_cfg = (config.get("data") or {})
+    data_cfg = dict(config.get("data") or {})
+    # A dataset YAML may override ``data:`` keys (e.g. Optima turns
+    # ``enrich_customer_context`` off: with one event per respondent the
+    # "mode chosen most often so far" line would be the label itself).
+    ds_data_override = dataset_yaml_dict.get("data") or {}
+    if ds_data_override:
+        data_cfg.update(ds_data_override)
+        logger.info("dataset YAML overrides data config: %s", ds_data_override)
     enrich_ctx = bool(data_cfg.get("enrich_customer_context", False))
     if enrich_ctx:
         from src.data.context_string import compute_customer_aggregates
@@ -898,6 +994,26 @@ def _run_pipeline_once(args: argparse.Namespace) -> int:
             "%d / %d customers (typical_distance_km / weekend_share / "
             "daypart_preference)",
             n_m_enriched, len(m_aggs),
+        )
+
+    # Expedia RecTour c_d enrichment: typical star tier, price tier, stay
+    # length, party size and lead time. Train-only, same fit for val/test.
+    if str(args.adapter) == "expedia_rectour":
+        from src.data.context_string import compute_hotel_aggregates
+        h_aggs = compute_hotel_aggregates(events_subset, train_only=True)
+        n_h_enriched = 0
+        for cid, agg in h_aggs.items():
+            if not agg:
+                continue
+            existing = customer_to_extras.get(str(cid), {}) or {}
+            existing.update(agg)
+            customer_to_extras[str(cid)] = existing
+            n_h_enriched += 1
+        logger.info(
+            "c_d enrichment (hotel aggregates): populated extras for %d / %d "
+            "customers (typical_star_rating / typical_price_tier / "
+            "typical_stay_nights / typical_party_size / typical_lead_days)",
+            n_h_enriched, len(h_aggs),
         )
 
     # Hard-negative sampling rate: opt-in via YAML ``data.hard_negative_rate``
@@ -941,7 +1057,7 @@ def _run_pipeline_once(args: argparse.Namespace) -> int:
             make_per_event_alt_overrides_fn,
         )
         centroid_path = (
-            REPO_ROOT / "mobility_trajectory_boston"
+            REPO_ROOT / "mobility_boston" / "data"
             / "Basic_Geographic_Statistics_CBG_Boston.csv"
         )
         overrides_fn = make_per_event_alt_overrides_fn(
@@ -950,6 +1066,137 @@ def _run_pipeline_once(args: argparse.Namespace) -> int:
         logger.info(
             "leak fix: symmetric per-(event, alt) price closure wired "
             "(centroid_path=%s)", centroid_path,
+        )
+
+    # Expedia RecTour: real displayed slates (no negative sampling), per-
+    # (search, property) alt attributes from impressions.csv, property
+    # catalog for never-chosen slate members, and the per-event trip
+    # phrase in c_d. Paths come from the dataset YAML's
+    # ``expedia_rectour:`` block (relative to the repo root).
+    real_slate_column: str | None = None
+    alt_catalog = None
+    per_event_context_fn = None
+    if str(args.adapter) == "expedia_rectour":
+        from src.data.expedia_slates import (
+            load_alt_catalog,
+            make_per_event_alt_overrides_fn,
+            make_per_event_context_fn,
+        )
+        ex_cfg = dataset_yaml_dict.get("expedia_rectour") or {}
+        data_root = Path(adapter.schema.events_path).parent
+        impressions_path = Path(
+            ex_cfg.get("impressions_path", data_root / "impressions.csv")
+        )
+        properties_path = Path(
+            ex_cfg.get("properties_path", data_root / "properties.csv")
+        )
+        for p in (impressions_path, properties_path):
+            if not p.is_absolute() and not p.exists():
+                p_alt = REPO_ROOT / p
+                if p_alt.exists():
+                    if p == impressions_path:
+                        impressions_path = p_alt
+                    else:
+                        properties_path = p_alt
+        if not impressions_path.exists():
+            raise SystemExit(
+                f"expedia_rectour: impressions file missing: {impressions_path} "
+                f"(run scripts/prepare_expedia_rectour.py first)."
+            )
+        real_slate_column = str(ex_cfg.get("slate_column", "slate_prop_ids"))
+        overrides_fn = make_per_event_alt_overrides_fn(
+            events_subset, impressions_path, properties_path,
+            search_id_column=str(ex_cfg.get("search_id_column", "search_id")),
+        )
+        alt_catalog = (
+            load_alt_catalog(properties_path) if properties_path.exists() else None
+        )
+        per_event_context_fn = make_per_event_context_fn(events_subset)
+        logger.info(
+            "expedia_rectour: real slates from %r, per-search alt attributes "
+            "from %s, catalog from %s (%d properties), trip phrase in c_d.",
+            real_slate_column, impressions_path, properties_path,
+            0 if alt_catalog is None else len(alt_catalog),
+        )
+
+    # Swissmetro (stated-preference mode choice): the slate is the set of
+    # available modes; per-(scenario, mode) travel time / cost / headway
+    # come from impressions.csv; the trip (purpose, payer, luggage,
+    # origin/destination) is rendered into c_d.
+    if str(args.adapter) == "swissmetro":
+        from src.data.expedia_slates import load_alt_catalog
+        from src.data.swissmetro_slates import (
+            make_per_event_alt_overrides_fn as _sm_overrides,
+            make_per_event_context_fn as _sm_context,
+        )
+        sm_cfg = dataset_yaml_dict.get("swissmetro") or {}
+        data_root = Path(adapter.schema.events_path).parent
+        impressions_path = Path(sm_cfg.get("impressions_path", data_root / "impressions.csv"))
+        properties_path = Path(sm_cfg.get("properties_path", data_root / "properties.csv"))
+        if not impressions_path.is_absolute() and not impressions_path.exists() \
+                and (REPO_ROOT / impressions_path).exists():
+            impressions_path = REPO_ROOT / impressions_path
+        if not properties_path.is_absolute() and not properties_path.exists() \
+                and (REPO_ROOT / properties_path).exists():
+            properties_path = REPO_ROOT / properties_path
+        if not impressions_path.exists():
+            raise SystemExit(
+                f"swissmetro: impressions file missing: {impressions_path} "
+                f"(run scripts/prepare_swissmetro.py first)."
+            )
+        real_slate_column = str(sm_cfg.get("slate_column", "slate_alt_ids"))
+        overrides_fn = _sm_overrides(
+            events_subset, impressions_path, properties_path,
+            scenario_id_column=str(sm_cfg.get("scenario_id_column", "scenario_id")),
+        )
+        alt_catalog = load_alt_catalog(properties_path) if properties_path.exists() else None
+        per_event_context_fn = _sm_context(events_subset)
+        logger.info(
+            "swissmetro: real slates from %r, per-scenario mode attributes from "
+            "%s, catalog from %s, trip phrase in c_d.",
+            real_slate_column, impressions_path, properties_path,
+        )
+
+    # Generic mode-choice adapters (optima, lpmc, ...): any dataset YAML
+    # with a top-level ``modechoice:`` block. Per-(event, mode) attributes
+    # come pre-rendered from impressions.csv; the trip phrase from a
+    # column of events.csv.
+    mc_cfg = dataset_yaml_dict.get("modechoice") or {}
+    if mc_cfg:
+        from src.data.expedia_slates import load_alt_catalog
+        from src.data.modechoice_slates import (
+            make_per_event_alt_overrides_fn as _mc_overrides,
+            make_per_event_context_fn as _mc_context,
+        )
+        data_root = Path(adapter.schema.events_path).parent
+        impressions_path = Path(mc_cfg.get("impressions_path", data_root / "impressions.csv"))
+        properties_path = Path(mc_cfg.get("properties_path", data_root / "properties.csv"))
+        for _name in ("impressions_path", "properties_path"):
+            _p = impressions_path if _name == "impressions_path" else properties_path
+            if not _p.is_absolute() and not _p.exists() and (REPO_ROOT / _p).exists():
+                if _name == "impressions_path":
+                    impressions_path = REPO_ROOT / _p
+                else:
+                    properties_path = REPO_ROOT / _p
+        if not impressions_path.exists():
+            raise SystemExit(
+                f"{args.adapter}: impressions file missing: {impressions_path} "
+                f"(run the dataset's prepare script first)."
+            )
+        real_slate_column = str(mc_cfg.get("slate_column", "slate_alt_ids"))
+        overrides_fn = _mc_overrides(
+            events_subset, impressions_path, properties_path,
+            event_id_column=str(mc_cfg.get("event_id_column", "event_id")),
+            currency=mc_cfg.get("currency"),
+        )
+        alt_catalog = load_alt_catalog(properties_path) if properties_path.exists() else None
+        per_event_context_fn = _mc_context(
+            events_subset, phrase_column=str(mc_cfg.get("phrase_column", "trip_phrase")),
+        )
+        logger.info(
+            "%s: generic mode-choice real slates from %r, attributes from %s, "
+            "catalog from %s, trip phrase in c_d.",
+            args.adapter, real_slate_column, impressions_path, properties_path,
         )
 
     records_all = build_choice_sets(
@@ -966,6 +1213,9 @@ def _run_pipeline_once(args: argparse.Namespace) -> int:
         add_event_time_to_c_d=add_event_time,
         add_event_origin_to_c_d=add_event_origin,
         per_event_alt_overrides_fn=overrides_fn,
+        real_slate_column=real_slate_column,
+        alt_catalog=alt_catalog,
+        per_event_context_fn=per_event_context_fn,
     )
 
     # Split records by the split label embedded in each record. Needed
@@ -1041,27 +1291,9 @@ def _run_pipeline_once(args: argparse.Namespace) -> int:
     # entirely. Different seeds NEVER share cache entries (seed is
     # folded into the composite key) so per-seed DBs don't change
     # any LLM cost; the only effect is removing lock contention.
-    paths_cfg = config.get("paths") or {}
-    cache_cfg = (config.get("outcomes") or {}).get("cache") or {}
     env_outcomes = os.environ.get("OUTCOMES_CACHE_PATH", "").strip()
     env_embeddings = os.environ.get("EMBEDDINGS_CACHE_PATH", "").strip()
-    outcomes_cache_path = Path(
-        env_outcomes or
-        cache_cfg.get("outcomes_path",
-                      (paths_cfg.get("outcomes_cache", "outcomes_cache/")
-                       + "outcomes.sqlite"))
-    )
-    embeddings_cache_path = Path(
-        env_embeddings or
-        cache_cfg.get("embeddings_path",
-                      (paths_cfg.get("embeddings_cache", "embeddings_cache/")
-                       + "embeddings.sqlite"))
-    )
-    # Make absolute against the repo root if relative.
-    if not outcomes_cache_path.is_absolute():
-        outcomes_cache_path = REPO_ROOT / outcomes_cache_path
-    if not embeddings_cache_path.is_absolute():
-        embeddings_cache_path = REPO_ROOT / embeddings_cache_path
+    outcomes_cache_path, embeddings_cache_path = _resolve_cache_paths(args, config)
     outcomes_cache_path.parent.mkdir(parents=True, exist_ok=True)
     embeddings_cache_path.parent.mkdir(parents=True, exist_ok=True)
     if env_outcomes or env_embeddings:
@@ -1262,7 +1494,17 @@ def _run_pipeline_once(args: argparse.Namespace) -> int:
     train_cfg = TrainConfig.from_default()
     train_cfg.batch_size = int(args.batch_size)
     train_cfg.max_epochs = int(args.n_epochs)
-    reg_cfg = RegularizerConfig.from_default()
+    # Regularizer λs come from the ``--config`` YAML actually passed (the
+    # historical hard-read of configs/default.yaml made every
+    # ``regularizers:`` key in an ablation config inert).
+    reg_cfg = RegularizerConfig.from_default(args.config)
+    logger.info(
+        "regularizers from %s: weight_l2=%g salience_entropy=%g diversity=%g "
+        "head_variance=%g head_alignment=%g monotonicity=%s(%g)",
+        args.config, reg_cfg.weight_l2, reg_cfg.salience_entropy, reg_cfg.diversity,
+        reg_cfg.head_variance, reg_cfg.head_alignment, reg_cfg.monotonicity_enabled,
+        reg_cfg.monotonicity,
+    )
 
     # ---- dataset-dependent p + regularizers-active diagnostics -----------
     # Spec §2.1 canonical p=26. Amazon-style datasets with collapsed
@@ -1297,6 +1539,8 @@ def _run_pipeline_once(args: argparse.Namespace) -> int:
             and batch_prices is not None
         ),
         "diversity": bool(reg_cfg.diversity > 0),
+        "head_variance": bool(reg_cfg.head_variance > 0),
+        "head_alignment": bool(reg_cfg.head_alignment > 0),
     }
     active_list = [k for k, v in regularizers_active.items() if v]
     logger.info("regularizers active: %s", ", ".join(active_list) or "none")
@@ -1475,7 +1719,16 @@ def _run_pipeline_once(args: argparse.Namespace) -> int:
     head_names_override: list[str] | None = None
     if prompt_version_cascade:
         last_pv = str(prompt_version_cascade[-1])
-        if last_pv.startswith("v4_mobility_anchored"):
+        if last_pv.startswith("v7_modechoice_anchored"):
+            from src.outcomes.prompts import MODECHOICE_ANCHORED_AXES
+            head_names_override = list(MODECHOICE_ANCHORED_AXES)
+        elif last_pv.startswith("v6_travel_anchored"):
+            from src.outcomes.prompts import TRAVEL_ANCHORED_AXES
+            head_names_override = list(TRAVEL_ANCHORED_AXES)
+        elif last_pv.startswith("v5_hotel_anchored"):
+            from src.outcomes.prompts import HOTEL_ANCHORED_AXES
+            head_names_override = list(HOTEL_ANCHORED_AXES)
+        elif last_pv.startswith("v4_mobility_anchored"):
             from src.outcomes.prompts import MOBILITY_ANCHORED_AXES
             head_names_override = list(MOBILITY_ANCHORED_AXES)
         elif last_pv.startswith("v3_anchored"):
@@ -1605,16 +1858,7 @@ def _run_with_refine(args: argparse.Namespace) -> int:
     # env-var-first / config-fallback rule inside _run_pipeline_once.
     config = _load_yaml(args.config)
     paths_cfg = config.get("paths") or {}
-    cache_cfg = (config.get("outcomes") or {}).get("cache") or {}
-    env_outcomes = os.environ.get("OUTCOMES_CACHE_PATH", "").strip()
-    outcomes_cache_path = Path(
-        env_outcomes
-        or cache_cfg.get(
-            "outcomes_path",
-            paths_cfg.get("outcomes_cache", "outcomes_cache/")
-            + "outcomes.sqlite",
-        )
-    )
+    outcomes_cache_path, _ = _resolve_cache_paths(args, config)
     if not outcomes_cache_path.is_absolute():
         outcomes_cache_path = REPO_ROOT / outcomes_cache_path
 

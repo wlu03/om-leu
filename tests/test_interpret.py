@@ -249,6 +249,7 @@ def test_run_all_reports_writes_jsons_when_out_dir_given(synthetic_batch, tmp_pa
         "per_decision.json",
         "dominant_attribute.json",
         "counterfactual.json",
+        "head_alignment.json",
     ]
     for fname in expected_files:
         p = out_dir / fname
@@ -257,12 +258,13 @@ def test_run_all_reports_writes_jsons_when_out_dir_given(synthetic_batch, tmp_pa
         loaded = json.loads(p.read_text())
         assert isinstance(loaded, dict)
 
-    # Bundle keys also match the four sub-reports.
+    # Bundle keys also match the five sub-reports.
     assert set(bundle.keys()) == {
         "head_naming",
         "per_decision",
         "dominant_attribute",
         "counterfactual",
+        "head_alignment",
     }
 
 

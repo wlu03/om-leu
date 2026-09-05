@@ -17,9 +17,9 @@ CLI
 ---
 
     python -m scripts.customer_analysis \\
-        --input-dir results_data/ \\
+        --input-dir amazon/results/ \\
         --tag-pattern "main_seed*" \\
-        --output-dir results_data/segmentation/
+        --output-dir amazon/results/segmentation/
 
 See the task spec for full argument semantics. The script is pure Python +
 NumPy/``statistics``.

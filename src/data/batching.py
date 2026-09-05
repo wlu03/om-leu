@@ -170,7 +170,9 @@ def _build_x_tab_matrix(
         "is_repeat",
         "log1p_purchase_count",
     }
-    needs_records = any(name in record_features for name in feature_names)
+    needs_records = any(
+        (name in record_features) or name.startswith("num:") for name in feature_names
+    )
     if needs_records and records is None:
         raise ValueError(
             "tabular feature(s) "
@@ -192,6 +194,19 @@ def _build_x_tab_matrix(
             if v is None:
                 return 0.0
             return float(v)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _alt_numeric(rec: dict, j: int, key: str) -> float:
+        """Read ``rec["alt_numeric"][j][key]`` (numeric side-channel that is
+        *not* rendered into the LLM prompt and does not enter the outcomes
+        cache key; see scripts/retrain_omleu_numeric.py). 0.0 on miss."""
+        try:
+            alts = rec.get("alt_numeric") or []
+            if j >= len(alts):
+                return 0.0
+            v = alts[j].get(key)
+            return 0.0 if v is None else float(v)
         except (TypeError, ValueError):
             return 0.0
 
@@ -253,7 +268,12 @@ def _build_x_tab_matrix(
 
 
     for f, name in enumerate(feature_names):
-        if name == "price":
+        if name.startswith("num:"):
+            key = name[4:]
+            for i, rec in enumerate(records):
+                for j in range(J):
+                    out[i, j, f] = _alt_numeric(rec, j, key)
+        elif name == "price":
             out[:, :, f] = prices_np
         elif name == "log1p_price":
             if log1p_prices is None:
@@ -736,6 +756,7 @@ def assemble_batch(
             K=K,
             model_id=getattr(llm_client, "model_id", "unknown"),
             c_d=rec["c_d"],
+            alt=rec["alt_texts"][j],
         )
         cached = thread_safe_cache.get_outcomes(
             str(rec["customer_id"]),

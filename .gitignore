@@ -1,5 +1,6 @@
 .env
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -7,43 +8,30 @@ __pycache__/
 .Python
 .ipynb_checkpoints/
 *.ipynb_checkpoints
-amazon_ecom/amazon-purchases.csv
-amazon_ecom/survey.csv
 .DS_Store
 dist/
 build/
 *.egg-info/
-**.sh
 **.pdf
 **/colab_runner.ipynb
 **/NEXT_STEPS.md
 paper/
 
-# PO-LEU artifacts
+# Documentation (kept local)
+docs/
+
+# Per-dataset directories: <name>/data (raw + prepared), <name>/results
+# (run outputs), <name>/cache (outcomes / embeddings sqlite). Only the
+# Amazon field description is versioned.
+*/data/*
+*/results/*
+*/cache/*
+!amazon/data/fields.csv
+
+# Tooling state
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-outcomes_cache/*.sqlite
-outcomes_cache/*.sqlite-wal
-outcomes_cache/*.sqlite-shm
-outcomes_cache/*.sqlite.corrupt.bak
-outcomes_cache/*.parquet
-embeddings_cache/*.sqlite
-embeddings_cache/*.sqlite-wal
-embeddings_cache/*.sqlite-shm
-embeddings_cache/*.sqlite.corrupt.bak
-embeddings_cache/*.parquet
-# Per-seed cache subdirs (e.g. outcomes_cache/seed7/outcomes.sqlite)
-outcomes_cache/seed*/
-embeddings_cache/seed*/
-checkpoints/*
-!checkpoints/.gitkeep
-reports/*
-!reports/.gitkeep
-
-# Run output (large, regeneratable)
-results_data/
-# Working scratch dir
 tmp/
-# Editor / IDE / agent state
 .claude/
+runs/

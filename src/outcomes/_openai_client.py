@@ -166,6 +166,18 @@ class OpenAILLMClient:
         Optional OpenAI organization ID. ``None`` falls back to
         ``OPENAI_ORGANIZATION`` in the environment. Passed straight
         through to the SDK constructor.
+    base_url:
+        Optional OpenAI-compatible endpoint (vLLM, Ollama ``/v1``,
+        llama.cpp, LM Studio, TGI ...). ``None`` falls back to
+        ``OPENAI_BASE_URL`` in the environment; when that is unset the
+        SDK's own default (api.openai.com) applies. Local servers ignore
+        the API key but the SDK insists on a non-empty one, so a
+        placeholder (``"not-needed"``) is substituted when a base URL is
+        set and no key is available.
+    extra_body:
+        Optional dict merged into every request as ``extra_body`` —
+        the escape hatch for server-specific knobs such as vLLM's
+        ``chat_template_kwargs={"enable_thinking": False}`` for Qwen3.
     """
 
     def __init__(
@@ -174,6 +186,8 @@ class OpenAILLMClient:
         *,
         api_key: str | None = None,
         organization: str | None = None,
+        base_url: str | None = None,
+        extra_body: dict[str, Any] | None = None,
     ) -> None:
         try:
             from openai import OpenAI  # type: ignore[import-not-found]
@@ -192,8 +206,18 @@ class OpenAILLMClient:
             if organization is not None
             else os.environ.get("OPENAI_ORGANIZATION")
         )
+        resolved_base = (
+            base_url if base_url is not None else os.environ.get("OPENAI_BASE_URL")
+        )
+        resolved_base = resolved_base.strip() if resolved_base else None
+        if resolved_base and not resolved_key:
+            # Local OpenAI-compatible servers do not authenticate, but
+            # the SDK refuses to construct without *some* key.
+            resolved_key = "not-needed"
         self._api_key = resolved_key
         self._organization = resolved_org
+        self._base_url = resolved_base
+        self._extra_body = dict(extra_body) if extra_body else None
 
         # The SDK tolerates ``organization=None`` but chokes on an empty
         # string in some versions; only forward the kwarg when we have a
@@ -202,6 +226,8 @@ class OpenAILLMClient:
         sdk_kwargs: dict[str, Any] = {"api_key": resolved_key}
         if resolved_org:
             sdk_kwargs["organization"] = resolved_org
+        if resolved_base:
+            sdk_kwargs["base_url"] = resolved_base
         self._client = OpenAI(**sdk_kwargs)
 
     # ------------------------------------------------------------------
@@ -245,7 +271,12 @@ class OpenAILLMClient:
             "messages": list(messages),
             "seed": seed,
         }
-        if _uses_max_completion_tokens(self.model_id):
+        if self._extra_body:
+            kwargs["extra_body"] = dict(self._extra_body)
+        # Open-weight servers (vLLM / Ollama) take the classical sampler
+        # knobs regardless of what the model is called, so the
+        # reasoning-family routing below only applies to OpenAI proper.
+        if _uses_max_completion_tokens(self.model_id) and not self._base_url:
             # Reasoning-family models (o1/o3/gpt-5) reject any non-default
             # temperature / top_p at the request layer ("Only the default
             # (1) value is supported"). Skip forwarding them so the caller's

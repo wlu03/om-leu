@@ -19,7 +19,7 @@ dataset:
     sentinels for has_kids, health_rating, risk_tolerance).
 
   events:
-    path: amazon_ecom/amazon-purchases.csv
+    path: amazon/data/amazon-purchases.csv
     parse_dates:
       - "Order Date"
     column_map:
@@ -43,7 +43,7 @@ dataset:
       asin: str
 
   persons:
-    path: amazon_ecom/survey.csv
+    path: amazon/data/survey.csv
     id_column: "Survey ResponseID"
 
     z_d_mapping:

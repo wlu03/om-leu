@@ -234,6 +234,7 @@ class POLEU(nn.Module):
         temperature: float = 1.0,
         tabular_residual_enabled: bool = False,
         tabular_features: Sequence[str] = DEFAULT_TABULAR_FEATURES,
+        semantic_gate_init: Optional[float] = None,
         n_categories: int = 1,
         d_cat: int = 8,
         mono_sign_per_customer: bool = False,
@@ -294,6 +295,16 @@ class POLEU(nn.Module):
         # exclude ``beta_tab`` to preserve this; see :meth:`tabular_residual_param_names`.
         self.tabular_residual_enabled = bool(tabular_residual_enabled)
         self.tabular_features: tuple[str, ...] = tuple(tabular_features)
+        # Optional learnable scalar gate on the semantic utility V. With
+        # ``semantic_gate_init=0.0`` the model starts *exactly* at the
+        # tabular residual's solution (two-stage estimation) and the gate
+        # grows only if the outcome-sentence utility improves the
+        # likelihood — so the fitted gate is a direct read-out of the
+        # semantic increment. ``None`` keeps the original behaviour.
+        self.semantic_gate: Optional[nn.Parameter] = (
+            nn.Parameter(torch.tensor(float(semantic_gate_init)))
+            if semantic_gate_init is not None else None
+        )
         if self.tabular_residual_enabled:
             n_tab = len(self.tabular_features)
             if n_tab == 0:
@@ -464,6 +475,8 @@ class POLEU(nn.Module):
         # constructor (which forgot to allocate β).
         V_residual: Optional[torch.Tensor] = None
         V_total: Optional[torch.Tensor] = None
+        if self.semantic_gate is not None:
+            V = V * self.semantic_gate
         if x_tab is not None:
             if not self.tabular_residual_enabled:
                 raise ValueError(

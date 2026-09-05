@@ -220,9 +220,10 @@ def test_cache_value_shape(tmp_cache_dir: Path) -> None:
         # AND a sha256 prefix of c_d into the cache-key's prompt_version
         # field (e.g. "v2-K3-stub-v1-cd<hash>"); the raw key-level
         # read-back must use that full composite value to find the entry.
+        from src.outcomes.generate import build_cache_prompt_version
         raw = cache.get_outcomes(
             "cust-A", "B-A", 1,
-            f"{PROMPT_VERSION}-K3-stub-v1-cd{_CD_HASH}",
+            build_cache_prompt_version(PROMPT_VERSION, 3, "stub-v1", _C_D, alt=_ALT),
         )
     finally:
         cache.close()
@@ -248,8 +249,12 @@ def test_cache_value_shape(tmp_cache_dir: Path) -> None:
     # cache_prompt_version folds in K and the sanitised model_id so a
     # stub-run entry can't collide with a real-run entry.
     assert metadata["prompt_version"] == PROMPT_VERSION
-    assert metadata["cache_prompt_version"] == (
-        f"{PROMPT_VERSION}-K3-stub-v1-cd{_CD_HASH}"
+    from src.outcomes.generate import build_cache_prompt_version
+    assert metadata["cache_prompt_version"] == build_cache_prompt_version(
+        PROMPT_VERSION, 3, "stub-v1", _C_D, alt=_ALT
+    )
+    assert metadata["cache_prompt_version"].startswith(
+        f"{PROMPT_VERSION}-K3-stub-v1-cd{_CD_HASH}-alt"
     )
     assert metadata["model_id"] == "stub-v1"
 
@@ -323,13 +328,14 @@ def test_cache_key_separates_stub_and_real(tmp_cache_dir: Path) -> None:
         # Outcomes must come from the real client, NOT the stub.
         assert real_payload.outcomes != stub_payload.outcomes
         # Sanity: both cache entries coexist under distinct composite keys.
+        from src.outcomes.generate import build_cache_prompt_version
         stub_raw = cache.get_outcomes(
             "cust", "B01", 11,
-            f"{PROMPT_VERSION}-K3-stub-v1-cd{_CD_HASH}",
+            build_cache_prompt_version(PROMPT_VERSION, 3, "stub-v1", _C_D, alt=_ALT),
         )
         real_raw = cache.get_outcomes(
             "cust", "B01", 11,
-            f"{PROMPT_VERSION}-K3-claude-test-7-cd{_CD_HASH}",
+            build_cache_prompt_version(PROMPT_VERSION, 3, "claude-test-7", _C_D, alt=_ALT),
         )
         assert stub_raw is not None
         assert real_raw is not None

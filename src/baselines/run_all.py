@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import os
 import time
 import traceback
@@ -108,6 +109,28 @@ def _openai_factory(model_id: str) -> Callable[[], Any]:
 #   LLM_SWEEP="Claude-Sonnet-4.6" ./run_full_evaluation.sh
 #   LLM_SWEEP="Claude-Sonnet-4.6,Gemini-2.5-Flash" ./run_full_evaluation.sh
 # An empty / unset ``LLM_SWEEP`` keeps the full 5-model sweep.
+def _openai_compatible_factory(model_id: str, base_url: str) -> Callable[[], Any]:
+    """Lazy factory for an open-weight model behind an OpenAI-compatible
+    endpoint (vLLM / Ollama / llama.cpp). No API key required."""
+    def _make() -> Any:
+        from src.outcomes._openai_client import OpenAILLMClient
+        extra_raw = os.environ.get("OPENAI_EXTRA_BODY", "").strip()
+        extra_body = json.loads(extra_raw) if extra_raw else None
+        return OpenAILLMClient(
+            model_id=model_id,
+            api_key=os.environ.get("OPENAI_API_KEY") or "not-needed",
+            base_url=base_url,
+            extra_body=extra_body,
+        )
+    return _make
+
+
+def _open_weight_display_suffix(model_id: str) -> str:
+    """``RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic`` -> ``Llama-3.3-70B-Instruct-FP8-dynamic``."""
+    tail = model_id.split("/")[-1]
+    return tail.replace(":", "-").replace(" ", "-")
+
+
 _LLM_MODEL_SWEEP_FULL: List[Tuple[str, Callable[[], Any]]] = [
     ("Claude-Sonnet-4.6",  _anthropic_factory("claude-sonnet-4-6")),
     ("Claude-Opus-4.6",    _anthropic_factory("claude-opus-4-6")),
@@ -115,6 +138,19 @@ _LLM_MODEL_SWEEP_FULL: List[Tuple[str, Callable[[], Any]]] = [
     ("Gemini-2.5-Flash",   _gemini_factory("gemini-2.5-flash")),
     ("GPT-5",              _openai_factory("gpt-5")),
 ]
+
+# Open-weight row: appended ONLY when ``OPENAI_COMPAT_MODEL`` is set, so
+# the default sweep (and its tests) are unchanged. The display suffix is
+# the model id's tail, e.g. ``ZeroShot-Llama-3.3-70B-Instruct-FP8-dynamic``.
+_OPEN_WEIGHT_MODEL = os.environ.get("OPENAI_COMPAT_MODEL", "").strip()
+_OPEN_WEIGHT_BASE_URL = os.environ.get("OPENAI_BASE_URL", "").strip()
+if _OPEN_WEIGHT_MODEL and _OPEN_WEIGHT_BASE_URL:
+    _LLM_MODEL_SWEEP_FULL.append(
+        (
+            _open_weight_display_suffix(_OPEN_WEIGHT_MODEL),
+            _openai_compatible_factory(_OPEN_WEIGHT_MODEL, _OPEN_WEIGHT_BASE_URL),
+        )
+    )
 
 
 def _apply_llm_sweep_filter(
@@ -222,7 +258,19 @@ def _build_registry() -> List[Tuple[str, str, str]]:
     # LLM_MODEL_SWEEP_SYMBOLIC, which can be narrowed independently via
     # the LLM_SYMBOLIC_SWEEP env var. Generative architectures stay on
     # the broader LLM_MODEL_SWEEP (controlled by LLM_SWEEP).
+    # ``LLM_BASELINE_SKIP`` (comma-separated architecture prefixes, e.g.
+    # ``LLM-SR,LaSR``) drops whole LLM-baseline families from the run —
+    # used when a self-hosted open-weight model should only serve the
+    # cheap generative rows (ZeroShot / FewShot-ICL), not the iterative
+    # symbolic-search ones.
+    skip_prefixes = {
+        s.strip().lower()
+        for s in os.environ.get("LLM_BASELINE_SKIP", "").split(",")
+        if s.strip()
+    }
     for prefix, module_path, class_name in _LLM_BASELINE_BASES:
+        if prefix.lower() in skip_prefixes:
+            continue
         sweep = (
             LLM_MODEL_SWEEP_SYMBOLIC
             if prefix in _SYMBOLIC_LLM_PREFIXES
@@ -242,6 +290,40 @@ BASELINE_REGISTRY: List[Tuple[str, str, str]] = _build_registry()
 # nats are written by :func:`annotate_uplift_vs_popularity` and surfaced
 # as a column in :func:`format_table`.
 UPLIFT_EXTRA_KEY = "nll_uplift_vs_popularity"
+
+
+def _auto_letters(cls: Any, n_alternatives: int, kwargs: Dict[str, Any]) -> None:
+    """Size the LLM rankers' answer alphabet to the batch's ``J`` in place.
+
+    ``ZeroShotClaudeRanker`` / ``FewShotICLRanker`` default to the 10-letter
+    ``DEFAULT_LETTERS`` and refuse any other ``J``. Real-slate datasets have
+    ``J = 3`` (Swissmetro) or any fixed ``J`` the prepare step chose, so when
+    the class accepts ``letters`` and the caller did not pass one, use the
+    first ``J`` default letters. No-op for classes without ``letters``.
+    """
+    if "letters" in kwargs:
+        return
+    try:
+        import inspect
+
+        params = inspect.signature(cls.__init__).parameters
+    except (TypeError, ValueError):
+        return
+    if "letters" not in params:
+        return
+    from src.baselines._llm_ranker_common import DEFAULT_LETTERS
+
+    if n_alternatives == len(DEFAULT_LETTERS):
+        return
+    if 1 <= n_alternatives <= len(DEFAULT_LETTERS):
+        kwargs["letters"] = tuple(DEFAULT_LETTERS[:n_alternatives])
+    else:
+        # More alternatives than default letters: extend with the alphabet.
+        import string
+
+        alphabet = tuple(string.ascii_uppercase)
+        if n_alternatives <= len(alphabet):
+            kwargs["letters"] = alphabet[:n_alternatives]
 
 
 def _try_load(module_path: str, class_name: str):
@@ -323,6 +405,8 @@ def run_all_baselines(
                         f"factory failed: {e}"
                     )
                 continue
+
+        _auto_letters(cls, int(train.n_alternatives), kwargs)
 
         try:
             baseline = cls(**kwargs)

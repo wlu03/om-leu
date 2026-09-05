@@ -50,8 +50,8 @@ outcomes:
     cos_sim_threshold: 0.9
     max_retries: 2
   cache:
-    outcomes_path: "outcomes_cache/outcomes.sqlite"
-    embeddings_path: "embeddings_cache/embeddings.sqlite"
+    outcomes_path: null   # null -> <adapter>/cache/outcomes.sqlite
+    embeddings_path: null   # null -> <adapter>/cache/embeddings.sqlite
 
 train:
   batch_size: 128
@@ -91,7 +91,7 @@ subsample:
   seed: 42
 
 paths:
-  outcomes_cache: "outcomes_cache/"
-  embeddings_cache: "embeddings_cache/"
-  checkpoints: "checkpoints/"
-  reports: "reports/"
+  outcomes_cache: null   # null -> <adapter>/cache/
+  embeddings_cache: null
+  checkpoints: null   # null -> <adapter>/results/
+  reports: null   # null -> <adapter>/results/

@@ -824,7 +824,23 @@ def _apply_derived_from_events(
     # Join back via the persons id column (already renamed to canonical
     # 'customer_id' by the caller).
     ids = persons[persons_id_canonical]
-    return ids.map(agg)
+    out = ids.map(agg)
+    # Customers with no training events (cold-start val/test customers)
+    # would otherwise carry NaN, which then poisons the train-set mean/std
+    # in ``fit_person_features`` and makes EVERY z_d non-finite. Fill with
+    # a neutral value: 0 for counts, the across-customer mean for means.
+    n_missing = int(out.isna().sum())
+    if n_missing:
+        if spec.aggregator == "count":
+            fill = 0.0
+        else:
+            fill = float(agg.mean()) if len(agg) and np.isfinite(agg.mean()) else 0.0
+        logger.info(
+            "derived_from_events %r: %d customers have no training events; "
+            "filled with %s.", spec.canonical_column, n_missing, fill,
+        )
+        out = out.fillna(fill)
+    return out
 
 
 # --------------------------------------------------------------------------- #

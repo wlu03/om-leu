@@ -97,9 +97,9 @@ for entry in "${SWEEP[@]}"; do
   IFS='|' read -r SEED PROVIDER MODEL DATASET <<<"$entry"
   TAG="seed_${SEED}_${MODEL}_${DATASET}"
   WIN="${PROVIDER:0:3}${SEED}_${DATASET:0:3}_${MODEL:0:14}"
-  OUT_DIR="reports/${TAG}"
-  CACHE_DIR_O="outcomes_cache/${TAG}"
-  CACHE_DIR_E="embeddings_cache/${TAG}"
+  OUT_DIR="${DATASET}/results/${TAG}"
+  CACHE_DIR_O="${DATASET}/cache/${TAG}"
+  CACHE_DIR_E="${DATASET}/cache/${TAG}"
   LOG_PATH="${OUT_DIR}/run.log"
   CMD_PATH="${OUT_DIR}/run.cmd"
 
@@ -189,7 +189,7 @@ Launched ${n_launched}-window tmux session: $SESSION
                                       critic=${REFINE_CRITIC})
 
 Per-window outputs (with --refine on):
-  reports/seed_<seed>_<model>_<dataset>/
+  <dataset>/results/seed_<seed>_<model>_<dataset>/
     ├─ run.log               live stdout from run_dataset.py
     ├─ run.cmd               exact command (for re-launch if window dies)
     ├─ round1/               round-1 (initial-train) artifacts

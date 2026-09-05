@@ -420,15 +420,17 @@ def test_kind_derived_from_events():
     assert counts["c2"] == 3
     assert counts["c3"] == 1
     assert counts["c4"] == 2
-    # c5 has no events -> NaN
-    assert pd.isna(counts["c5"])
+    # c5 has no events -> filled with 0 (cold-start customers must stay
+    # finite so the train-set standardization is not poisoned by NaN)
+    assert counts["c5"] == 0
 
     means = dict(zip(out["customer_id"], out["novelty_rate"]))
     assert means["c1"] == pytest.approx(0.5)
     assert means["c2"] == pytest.approx(2 / 3)
     assert means["c3"] == pytest.approx(1.0)
     assert means["c4"] == pytest.approx(0.0)
-    assert pd.isna(means["c5"])
+    # c5 has no events -> filled with the across-customer mean (finite)
+    assert not pd.isna(means["c5"])
 
 
 def test_kind_passthrough():

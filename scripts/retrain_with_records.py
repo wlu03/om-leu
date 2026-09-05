@@ -8,15 +8,15 @@ regularizers, etc.) and compare to the original run.
 Usage::
 
     python -m scripts.retrain_with_records \\
-        --records   results_data/poleu_25cust_seed7_residual/records.pkl \\
+        --records   amazon/results/poleu_25cust_seed7_residual/records.pkl \\
         --config    configs/higher_beta.yaml \\
-        --output-dir results_data/seed7_higher_beta \\
+        --output-dir amazon/results/seed7_higher_beta \\
         --tabular-residual true \\
         --seed 7
 
 Reads ``OUTCOMES_CACHE_PATH`` / ``EMBEDDINGS_CACHE_PATH`` env vars to
 point at the per-seed cache from the original run (e.g.
-``outcomes_cache/seed7/outcomes.sqlite``). Same env-var contract as
+``amazon/cache/seed7/outcomes.sqlite``). Same env-var contract as
 ``scripts.run_dataset``.
 """
 
@@ -63,6 +63,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tabular-residual", choices=["yaml", "true", "false"],
                    default="yaml",
                    help="Override model.tabular_residual.enabled.")
+    p.add_argument("--residual-prefit", action="store_true",
+                   help="Stage 1: fit the tabular residual's beta_tab alone as an MNL on x_tab "
+                        "(L-BFGS, full batch) before the joint fit, so the linear part starts at "
+                        "its maximum-likelihood solution (two-stage estimation).")
+    p.add_argument("--semantic-gate-init", type=float, default=None,
+                   help="Learnable scalar gate on the semantic utility, initialised here "
+                        "(0.0 = start at the residual-only solution). Default: no gate.")
     p.add_argument("--residual-lr-multiplier", type=float, default=None,
                    help="Override train.residual_lr_multiplier from config.")
     p.add_argument(
@@ -126,16 +133,31 @@ def main() -> int:
         logger.info("CLI override: train.residual_lr_multiplier=%.2f", args.residual_lr_multiplier)
 
     # 3. Build llm_client + encoder + caches (real-only — same as run_dataset).
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise SystemExit("ANTHROPIC_API_KEY missing — driver is real-LLM-only.")
-
     from src.outcomes.encode import SentenceTransformersEncoder
-    from src.outcomes.generate import AnthropicLLMClient
 
     enc_cfg = (config.get("outcomes") or {}).get("encoder") or {}
-    model_id = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-    llm_client = AnthropicLLMClient(model_id=model_id, api_key=api_key)
+    cache_only_model = os.environ.get("RETRAIN_CACHE_ONLY_MODEL_ID", "").strip()
+    if cache_only_model:
+        # Replay mode: the outcomes cache is keyed on the original run's
+        # model id; any miss is an error rather than a fresh LLM call.
+        class _CacheOnlyClient:
+            model_id = cache_only_model
+
+            def generate(self, *a, **k):
+                raise RuntimeError("outcomes cache miss in RETRAIN_CACHE_ONLY mode; refusing to call an LLM")
+
+            complete = generate
+
+        llm_client = _CacheOnlyClient()
+        logger.info("cache-only replay: model_id=%s", cache_only_model)
+    else:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise SystemExit("ANTHROPIC_API_KEY missing — driver is real-LLM-only "
+                             "(or set RETRAIN_CACHE_ONLY_MODEL_ID for cache replay).")
+        from src.outcomes.generate import AnthropicLLMClient
+        model_id = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+        llm_client = AnthropicLLMClient(model_id=model_id, api_key=api_key)
     encoder = SentenceTransformersEncoder(
         model_id=enc_cfg.get("model_id", "sentence-transformers/all-mpnet-base-v2"),
         max_length=int(enc_cfg.get("max_length", 64)),
@@ -148,9 +170,9 @@ def main() -> int:
     env_outcomes = os.environ.get("OUTCOMES_CACHE_PATH", "").strip()
     env_embeddings = os.environ.get("EMBEDDINGS_CACHE_PATH", "").strip()
     outcomes_cache_path = Path(env_outcomes or cache_cfg.get(
-        "outcomes_path", paths_cfg.get("outcomes_cache", "outcomes_cache/") + "outcomes.sqlite"))
+        "outcomes_path", (paths_cfg.get("outcomes_cache") or "amazon/cache/") + "outcomes.sqlite"))
     embeddings_cache_path = Path(env_embeddings or cache_cfg.get(
-        "embeddings_path", paths_cfg.get("embeddings_cache", "embeddings_cache/") + "embeddings.sqlite"))
+        "embeddings_path", (paths_cfg.get("embeddings_cache") or "amazon/cache/") + "embeddings.sqlite"))
     if not outcomes_cache_path.is_absolute():
         outcomes_cache_path = REPO_ROOT / outcomes_cache_path
     if not embeddings_cache_path.is_absolute():
@@ -247,6 +269,8 @@ def main() -> int:
         n_categories=n_categories_runtime,
         d_cat=int(snet_cfg.get("d_cat", 8)),
     )
+    if args.semantic_gate_init is not None:
+        poleu_kwargs["semantic_gate_init"] = float(args.semantic_gate_init)
     if tab_names is not None and batch_train.x_tab is not None:
         poleu_kwargs["tabular_residual_enabled"] = True
         poleu_kwargs["tabular_features"] = tuple(tab_names)
@@ -261,6 +285,34 @@ def main() -> int:
         logger.info("tabular stats fit on train: mean=%s std=%s",
                     mean.tolist(), std.tolist())
 
+    # 6b. Optional stage-1 pre-fit of the linear residual (beta_tab only).
+    if args.residual_prefit and getattr(model, "tabular_residual_enabled", False) and batch_train.x_tab is not None:
+        x_std = ((batch_train.x_tab - model.x_tab_mean) / model.x_tab_std).detach()
+        y = batch_train.c_star.detach()
+        opt = torch.optim.LBFGS([model.beta_tab], lr=1.0, max_iter=500, tolerance_grad=1e-7,
+                                tolerance_change=1e-9, history_size=50, line_search_fn="strong_wolfe")
+
+        def _closure():
+            opt.zero_grad()
+            logits = (x_std * model.beta_tab).sum(dim=-1)
+            loss = torch.nn.functional.cross_entropy(logits, y) + 1e-4 * (model.beta_tab ** 2).sum()
+            loss.backward()
+            return loss
+
+        before = float(_closure())
+        opt.step(_closure)
+        after = float(_closure())
+        logger.info("residual prefit (stage 1, MNL on x_tab): train CE %.4f -> %.4f", before, after)
+        # Residual-only reference: what the linear stage alone achieves on test.
+        from src.eval.metrics import compute_all as _compute_all
+        with torch.no_grad():
+            x_te = (batch_test.x_tab - model.x_tab_mean) / model.x_tab_std
+            logits_ro = (x_te * model.beta_tab).sum(dim=-1)
+            m_ro = _compute_all(logits_ro, batch_test.c_star, n_params=int(model.beta_tab.numel()),
+                                n_train=len(batch_train))
+        (out_dir / "metrics_test_residual_only.json").write_text(json.dumps(m_ro.to_dict(), indent=2))
+        logger.info("residual-only test: top1=%.4f nll=%.4f", m_ro.top1, m_ro.nll_val)
+
     # 7. Train.
     from src.train.loop import TrainConfig, fit
     from src.train.regularizers import RegularizerConfig
@@ -271,7 +323,7 @@ def main() -> int:
     train_block = (config.get("train") or {})
     for fld in ("batch_size", "lr", "lr_min", "max_epochs",
                 "early_stopping_patience", "grad_clip", "residual_lr_multiplier"):
-        if fld in train_block:
+        if fld in train_block and hasattr(train_cfg, fld):
             setattr(train_cfg, fld, type(getattr(train_cfg, fld))(train_block[fld]))
 
     reg_block = config.get("regularizers") or {}
@@ -296,7 +348,7 @@ def main() -> int:
     n_batches = max(1, math.ceil(len(batch_train) / train_cfg.batch_size))
     total_steps = n_batches * train_cfg.max_epochs
     logger.info("stage: fit (residual_lr_multiplier=%.2f, max_epochs=%d, batch_size=%d, n_train=%d)",
-                train_cfg.residual_lr_multiplier, train_cfg.max_epochs,
+                getattr(train_cfg, "residual_lr_multiplier", 1.0), train_cfg.max_epochs,
                 train_cfg.batch_size, len(batch_train))
     state = fit(model, train_batches_fn, val_batches_fn, train_cfg=train_cfg,
                 reg_cfg=reg_cfg, total_steps=total_steps, seed=int(args.seed))
@@ -321,11 +373,21 @@ def main() -> int:
         n_params=np.array(int(model.num_params()), dtype=np.int64),
     )
 
+    probs = torch.softmax(logits_test, dim=1)
+    p_chosen = probs.gather(1, batch_test.c_star.view(-1, 1)).squeeze(1)
+    (out_dir / "test_per_event.json").write_text(json.dumps({"per_event": [
+        {"event_idx": i, "customer_id": str(r.get("customer_id")), "asin_chosen": str(r.get("chosen_asin")),
+         "c_star": int(c), "p_chosen": float(pc), "nll": float(-torch.log(pc.clamp_min(1e-12))),
+         "top1_correct": bool(int(l.argmax()) == int(c))}
+        for i, (r, c, pc, l) in enumerate(zip(test_recs, batch_test.c_star, p_chosen, logits_test))
+    ]}, indent=1))
+
     summary = {
         "records_from": str(args.records),
         "config_used": str(args.config),
-        "residual_lr_multiplier": train_cfg.residual_lr_multiplier,
+        "residual_lr_multiplier": getattr(train_cfg, "residual_lr_multiplier", 1.0),
         "tabular_residual_enabled": getattr(model, "tabular_residual_enabled", False),
+        "semantic_gate": (float(model.semantic_gate.detach()) if getattr(model, "semantic_gate", None) is not None else None),
         "n_train": len(batch_train), "n_val": len(batch_val), "n_test": len(batch_test),
         "n_params": int(model.num_params()),
         "train_state": asdict(state),

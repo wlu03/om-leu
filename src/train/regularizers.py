@@ -351,6 +351,82 @@ def head_score_variance(A: torch.Tensor) -> torch.Tensor:
     return var_k.mean()
 
 
+def head_slot_alignment(A: torch.Tensor) -> torch.Tensor:
+    """Cross-entropy pulling head ``m`` toward outcome slot ``k = m``.
+
+    The anchored prompts (``v3_anchored`` and later) ask the generator for
+    exactly one outcome per semantic axis, in the same canonical order as
+    the M attribute heads are named. Nothing in the model used that
+    alignment: every head scores every slot and the heads are only kept
+    apart by initialisation, so they drift into scaled copies of one
+    another (all five heads ranking the same sentences highest, one head
+    dominating every event). This term makes each head *prefer its own
+    slot*: for every (b, j, m) the scores ``A[b, j, :, m]`` over the K
+    slots are softmaxed and the negative log-probability of slot ``k = m``
+    is averaged. Heads still score all slots (the decomposition is
+    unchanged); they are just no longer free to be identical.
+
+    Returns 0 (with a gradient path) when ``K != M`` — the free-form K=3
+    prompt has no slot/axis correspondence to enforce.
+
+    Parameters
+    ----------
+    A:
+        Attribute-score tensor ``(B, J, K, M)``.
+
+    Returns
+    -------
+    torch.Tensor
+        0-dim scalar, non-negative (mean cross-entropy in nats).
+    """
+    if A.dim() != 4:
+        raise ValueError(
+            f"A must be 4-D (B, J, K, M); got shape {tuple(A.shape)}."
+        )
+    B, J, K, M = A.shape
+    if K != M:
+        return (A * 0.0).sum()
+    log_p = torch.log_softmax(A, dim=2)                   # over K slots
+    diag = torch.diagonal(log_p, dim1=2, dim2=3)          # (B, J, M): k == m
+    return -diag.mean()
+
+
+def head_slot_alignment_diagnostics(A: torch.Tensor) -> dict:
+    """Numbers that show whether the heads are aligned or collapsed.
+
+    * ``slot_argmax_agreement`` — fraction of (b, j, m) where head ``m``'s
+      highest-scoring slot is ``k = m`` (chance = 1/K; 1.0 = perfectly
+      diagonal). ``None`` when ``K != M``.
+    * ``mean_score_matrix`` — ``K x M`` mean of ``A`` over (b, j): rows are
+      slots, columns heads; a diagonal-dominant matrix means alignment.
+    * ``head_score_correlation`` — ``M x M`` Pearson correlation of the
+      heads' scores over all (b, j, k); an all-ones matrix means collapse.
+    * ``per_head_top_slot`` — argmax slot of each head's mean scores.
+    """
+    if A.dim() != 4:
+        raise ValueError(f"A must be 4-D; got {tuple(A.shape)}")
+    B, J, K, M = A.shape
+    A_ = A.detach().to(torch.float64)
+    mean_mat = A_.mean(dim=(0, 1))                          # (K, M)
+    flat = A_.reshape(B * J * K, M)
+    centred = flat - flat.mean(dim=0, keepdim=True)
+    denom = centred.norm(dim=0, keepdim=True).clamp_min(1e-12)
+    corr = (centred / denom).T @ (centred / denom)          # (M, M)
+    out: dict = {
+        "K": int(K),
+        "M": int(M),
+        "mean_score_matrix": mean_mat.tolist(),
+        "head_score_correlation": corr.tolist(),
+        "per_head_top_slot": [int(i) for i in mean_mat.argmax(dim=0).tolist()],
+        "slot_argmax_agreement": None,
+    }
+    if K == M:
+        top_slot = A_.argmax(dim=2)                          # (B, J, M)
+        target = torch.arange(M, device=A_.device).view(1, 1, M)
+        out["slot_argmax_agreement"] = float((top_slot == target).double().mean().item())
+    return out
+
+
 # ---------------------------------------------------------------------------
 # 5. RegularizerConfig (§9.2 λ table + configs/default.yaml Appendix B).
 # ---------------------------------------------------------------------------
@@ -391,6 +467,11 @@ class RegularizerConfig:
     # convention as ``salience_entropy``) so positive λ pushes per-head
     # variance UP, preventing the dead-head pattern. 0.0 = legacy.
     head_variance: float = DEFAULT_LAMBDA_HEAD_VARIANCE
+    # See ``head_slot_alignment``. Added to the loss: positive λ makes
+    # head m prefer outcome slot k = m (the axis the anchored prompt put
+    # there), which is what stops the M heads from collapsing into scaled
+    # copies of one another. 0.0 = legacy (no alignment).
+    head_alignment: float = 0.0
     # Group-2: replace global "lower price = higher utility" prior with a
     # per-customer learnable σ(z_d) ∈ [-1, +1] via tanh. The MonoSignNet
     # MLP lives on the model side; this dataclass only carries the
@@ -399,11 +480,13 @@ class RegularizerConfig:
     mono_sign_hidden: int = 16
 
     @classmethod
-    def from_default(cls) -> "RegularizerConfig":
+    def from_default(cls, path: "str | Path | None" = None) -> "RegularizerConfig":
         """Load Appendix B defaults from ``configs/default.yaml``.
 
-        The YAML block ``regularizers:`` must supply
-        ``weight_l2``, ``salience_entropy``, ``diversity`` (scalars) and
+        ``path`` overrides the YAML file (e.g. the ``--config`` a driver
+        was given); ``None`` keeps the historical hard-coded default. The
+        YAML block ``regularizers:`` must supply ``weight_l2``,
+        ``salience_entropy``, ``diversity`` (scalars) and
         ``monotonicity: {enabled: bool, lambda: float, ...}``.
 
         Returns
@@ -414,7 +497,7 @@ class RegularizerConfig:
         """
         import yaml
 
-        with open(_DEFAULT_CONFIG_PATH, "r") as fh:
+        with open(_DEFAULT_CONFIG_PATH if path is None else path, "r") as fh:
             cfg = yaml.safe_load(fh)
 
         reg = cfg["regularizers"]
@@ -430,6 +513,8 @@ class RegularizerConfig:
             head_variance=float(
                 reg.get("head_variance", DEFAULT_LAMBDA_HEAD_VARIANCE)
             ),
+            # head_alignment is optional in YAML — missing key -> 0.0.
+            head_alignment=float(reg.get("head_alignment", 0.0)),
             # Group-2: monotonicity sign knobs (optional in YAML).
             mono_sign_per_customer=bool(
                 mono_block.get("per_customer", False)
@@ -502,6 +587,11 @@ def combined_regularizer(
     # Cheap (no extra forward), gradient flows through ``intermediates.A``.
     if cfg.head_variance != 0.0:
         total = total - cfg.head_variance * head_score_variance(intermediates.A)
+
+    # Diagonal head/slot alignment (added: positive λ pulls head m toward
+    # outcome slot m). No-op unless K == M (anchored prompts).
+    if cfg.head_alignment != 0.0:
+        total = total + cfg.head_alignment * head_slot_alignment(intermediates.A)
 
     if cfg.monotonicity_enabled and prices is not None:
         # Group-2: per-customer signed monotonicity. When the model has

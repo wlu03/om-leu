@@ -26,7 +26,12 @@ import torch
 
 from src.data.batching import AssembledBatch, assemble_batch, iter_to_torch_batches
 from src.outcomes.encode import StubEncoder
-from src.outcomes.generate import StubLLMClient, GenerationResult, OutcomesPayload
+from src.outcomes.generate import (
+    GenerationResult,
+    OutcomesPayload,
+    StubLLMClient,
+    build_cache_prompt_version,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -735,11 +740,11 @@ def _precompute_stub_contamination(cache: Any, records: list[dict]) -> None:
         # V5-B1: generate.py now folds sha256(c_d)[:16] into the
         # composite prompt_version, so the stub entry has to land under
         # the same composite the real-client lookup will compute.
-        cd_hash = hashlib.sha256(
-            rec["c_d"].encode("utf-8")
-        ).hexdigest()[:16]
-        composite = f"v1-K3-claude-test-7-cd{cd_hash}"
         for j, asin in enumerate(rec["choice_asins"]):
+            # The composite also folds in the alternative's attributes.
+            composite = build_cache_prompt_version(
+                "v1", 3, "claude-test-7", rec["c_d"], alt=rec["alt_texts"][j]
+            )
             cache.put_outcomes(
                 str(rec["customer_id"]),
                 str(asin),
@@ -803,14 +808,13 @@ def test_assemble_accepts_clean_cache(tmp_path: Path):
     # And the cache now holds entries under the real composite key.
     # V5-B1: the cache composite now includes a sha256 of the record's
     # c_d, so compute the hash here to locate the fresh entry.
-    cd_hash_0 = hashlib.sha256(
-        records[0]["c_d"].encode("utf-8")
-    ).hexdigest()[:16]
     got = o_cache.get_outcomes(
         records[0]["customer_id"],
         records[0]["choice_asins"][0],
         0,
-        f"v1-K3-claude-test-7-cd{cd_hash_0}",
+        build_cache_prompt_version(
+            "v1", 3, "claude-test-7", records[0]["c_d"], alt=records[0]["alt_texts"][0]
+        ),
     )
     assert got is not None
     assert got["metadata"]["model_id"] == "claude-test-7"

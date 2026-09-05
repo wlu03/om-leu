@@ -122,6 +122,134 @@ SYSTEM_PROMPT_MOBILITY_ANCHORED: str = (
 )
 
 # ---------------------------------------------------------------------------
+# Hotel-anchored prompt (Expedia RecTour lodging search). M=5 axes tuned to
+# a stay-choice rather than a purchase or a trip. Separate cache key so
+# v3_anchored / v4_mobility_anchored entries are never silently reused.
+# ---------------------------------------------------------------------------
+
+PROMPT_VERSION_HOTEL_ANCHORED: str = "v5_hotel_anchored"
+
+# Maps 1:1 onto the M=5 attribute heads when used with anchored generation.
+# Order is canonical and must match the head-naming list passed to
+# :func:`src.eval.interpret.head_naming_report`.
+HOTEL_ANCHORED_AXES: tuple[str, ...] = (
+    "financial",
+    "comfort",
+    "convenience",
+    "trust",
+    "experience",
+)
+
+SYSTEM_PROMPT_HOTEL_ANCHORED: str = (
+    "You generate short first-person outcome narratives for a traveler "
+    "deciding whether to book a particular property for an upcoming stay. "
+    "Produce exactly K=5 sentences, one per axis, in this canonical order: "
+    "financial, comfort, convenience, trust, experience. Each outcome "
+    "describes a plausible consequence FOR THIS TRAVELER if they book THIS "
+    "property for THIS trip, scored along ITS axis:\n"
+    "  - financial: what the stay does to their budget; value for money.\n"
+    "  - comfort: rest, room quality, amenities, how the stay feels day-to-day.\n"
+    "  - convenience: hassle, flexibility, cancellation, getting around.\n"
+    "  - trust: confidence the stay will match expectations (reviews, stars).\n"
+    "  - experience: enjoyment, memories, how the trip goes for the party.\n"
+    "Price is given as a tier from 1 (cheapest shown) to 5 (most expensive "
+    "shown), not in currency. Each sentence is 10-25 words, first-person, "
+    "present or near-future tense. Do not describe the property itself. Do "
+    "not number sentences; separate them with newlines. If an axis is "
+    "genuinely irrelevant for this stay, write a brief honest "
+    "acknowledgement; the salience layer will down-weight it."
+)
+
+# ---------------------------------------------------------------------------
+# Travel-mode-anchored prompt (Swissmetro stated-preference mode choice).
+# M=5 axes tuned to choosing HOW to make a given intercity trip. Separate
+# cache key from every other anchored family.
+# ---------------------------------------------------------------------------
+
+PROMPT_VERSION_TRAVEL_ANCHORED: str = "v6_travel_anchored"
+
+TRAVEL_ANCHORED_AXES: tuple[str, ...] = (
+    "financial",
+    "time",
+    "comfort",
+    "convenience",
+    "reliability",
+)
+
+SYSTEM_PROMPT_TRAVEL_ANCHORED: str = (
+    "You generate short first-person outcome narratives for a traveler "
+    "deciding which mode of transport to take for a specific intercity trip "
+    "in Switzerland. Produce exactly K=5 sentences, one per axis, in this "
+    "canonical order: financial, time, comfort, convenience, reliability. "
+    "Each outcome describes a plausible consequence FOR THIS TRAVELER if they "
+    "take THIS option for THIS trip, scored along ITS axis:\n"
+    "  - financial: what the fare or running cost does to their budget; who pays.\n"
+    "  - time: door-to-door duration, waiting between departures, time they can use.\n"
+    "  - comfort: seating, rest, noise, luggage handling, crowding, driving effort.\n"
+    "  - convenience: flexibility, schedule fit, connections, parking, transfers.\n"
+    "  - reliability: confidence in arriving as planned; delays, traffic, weather.\n"
+    "Costs are in Swiss francs (CHF); times and headways are in minutes. "
+    "Each sentence is 10-25 words, first-person, present or near-future "
+    "tense. Do not describe the mode itself. Do not number sentences; "
+    "separate them with newlines. If an axis is genuinely irrelevant for "
+    "this trip, write a brief honest acknowledgement; the salience layer "
+    "will down-weight it."
+)
+
+# ---------------------------------------------------------------------------
+# Generic mode-choice prompt (Optima, LPMC ...). Same five axes as the
+# Swissmetro prompt, but no dataset-specific framing: the currency and the
+# trip come from the alternative block and c_d.
+# ---------------------------------------------------------------------------
+
+PROMPT_VERSION_MODECHOICE_ANCHORED: str = "v7_modechoice_anchored"
+
+MODECHOICE_ANCHORED_AXES: tuple[str, ...] = TRAVEL_ANCHORED_AXES
+
+SYSTEM_PROMPT_MODECHOICE_ANCHORED: str = (
+    "You generate short first-person outcome narratives for a traveler "
+    "deciding how to make a specific trip. Produce exactly K=5 sentences, "
+    "one per axis, in this canonical order: financial, time, comfort, "
+    "convenience, reliability. Each outcome describes a plausible "
+    "consequence FOR THIS TRAVELER if they use THIS option for THIS trip, "
+    "scored along ITS axis:\n"
+    "  - financial: what the fare, fuel or running cost does to their budget.\n"
+    "  - time: door-to-door duration, waiting and interchanges, time they can use.\n"
+    "  - comfort: physical effort, exposure to weather, seating, crowding, stress.\n"
+    "  - convenience: flexibility, schedule fit, parking, carrying things, transfers.\n"
+    "  - reliability: confidence in arriving as planned; delays, traffic, weather.\n"
+    "Prices are given in the currency shown in the alternative; times are "
+    "as shown. Each sentence is 10-25 words, first-person, present or "
+    "near-future tense. Do not describe the mode itself. Do not number "
+    "sentences; separate them with newlines. If an axis is genuinely "
+    "irrelevant for this trip, write a brief honest acknowledgement; the "
+    "salience layer will down-weight it."
+)
+
+
+def build_messages_modechoice_anchored(
+    c_d: str,
+    alt: Mapping[str, Any],
+    K: int,
+    optional_fields: Mapping[str, Any] | None = None,
+) -> list[dict]:
+    """Generic mode-choice variant of :func:`build_messages` (K = 5)."""
+    if K != len(MODECHOICE_ANCHORED_AXES):
+        raise ValueError(
+            f"expected K=5 to match MODECHOICE_ANCHORED_AXES; got K={K}"
+        )
+    user_content = build_user_block(
+        c_d=c_d,
+        alt=alt,
+        K=K,
+        optional_fields=optional_fields,
+    )
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT_MODECHOICE_ANCHORED},
+        {"role": "user", "content": user_content},
+    ]
+
+# ---------------------------------------------------------------------------
 # Curriculum refinement prompts (commit: critique-and-revise loop). Used by
 # :mod:`src.outcomes.refine` to fix outcomes for events the model fails on.
 # Bump :data:`REFINED_PROMPT_VERSION` when either template changes — it is
@@ -353,11 +481,12 @@ def build_user_block(
     # ``optional_fields`` kwarg wins on key collision for non-canonical
     # keys (canonical collisions are rejected above).
     extras_from_alt = {
-        k: alt[k] for k in alt.keys() if k not in _REQUIRED_ALT_FIELDS
+        k: alt[k] for k in alt.keys()
+        if k not in _REQUIRED_ALT_FIELDS and k != "currency"
     }
     if optional_fields:
         extras_from_alt.update(dict(optional_fields))
-    return USER_BLOCK_TEMPLATE.format(
+    rendered = USER_BLOCK_TEMPLATE.format(
         c_d=c_d,
         title=alt["title"],
         category=alt["category"],
@@ -366,6 +495,20 @@ def build_user_block(
         optional_fields=_render_optional_fields(extras_from_alt),
         K=K,
     )
+    # Non-USD datasets pass ``alt["currency"]`` (e.g. "CHF"): the canonical
+    # price line then reads "Price: CHF 52" instead of "$52.0". The USD
+    # path is byte-identical to before so existing caches stay aligned.
+    currency = alt.get("currency")
+    if currency:
+        try:
+            p = float(alt["price"])
+            p_txt = str(int(p)) if p.is_integer() else f"{p:.2f}"
+        except (TypeError, ValueError):
+            p_txt = str(alt["price"])
+        rendered = rendered.replace(
+            f"- Price: ${alt['price']}\n", f"- Price: {currency} {p_txt}\n", 1
+        )
+    return rendered
 
 
 def build_messages(
@@ -452,6 +595,66 @@ def build_messages_mobility_anchored(
     )
     return [
         {"role": "system", "content": SYSTEM_PROMPT_MOBILITY_ANCHORED},
+        {"role": "user", "content": user_content},
+    ]
+
+
+def build_messages_hotel_anchored(
+    c_d: str,
+    alt: Mapping[str, Any],
+    K: int,
+    optional_fields: Mapping[str, Any] | None = None,
+) -> list[dict]:
+    """Hotel-anchored variant of :func:`build_messages` (Expedia RecTour).
+
+    Forces ``K == len(HOTEL_ANCHORED_AXES) == 5`` and uses
+    :data:`SYSTEM_PROMPT_HOTEL_ANCHORED` so the LLM emits one outcome per
+    lodging-tuned axis (financial, comfort, convenience, trust,
+    experience) in canonical order, aligning 1:1 with the M=5 attribute
+    heads under the head_names override :data:`HOTEL_ANCHORED_AXES`.
+    """
+    if K != len(HOTEL_ANCHORED_AXES):
+        raise ValueError(
+            f"expected K=5 to match HOTEL_ANCHORED_AXES; got K={K}"
+        )
+    user_content = build_user_block(
+        c_d=c_d,
+        alt=alt,
+        K=K,
+        optional_fields=optional_fields,
+    )
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT_HOTEL_ANCHORED},
+        {"role": "user", "content": user_content},
+    ]
+
+
+def build_messages_travel_anchored(
+    c_d: str,
+    alt: Mapping[str, Any],
+    K: int,
+    optional_fields: Mapping[str, Any] | None = None,
+) -> list[dict]:
+    """Travel-mode-anchored variant of :func:`build_messages` (Swissmetro).
+
+    Forces ``K == len(TRAVEL_ANCHORED_AXES) == 5`` and uses
+    :data:`SYSTEM_PROMPT_TRAVEL_ANCHORED` so the LLM emits one outcome per
+    mode-choice axis (financial, time, comfort, convenience, reliability)
+    in canonical order, aligning 1:1 with the M=5 attribute heads under the
+    head_names override :data:`TRAVEL_ANCHORED_AXES`.
+    """
+    if K != len(TRAVEL_ANCHORED_AXES):
+        raise ValueError(
+            f"expected K=5 to match TRAVEL_ANCHORED_AXES; got K={K}"
+        )
+    user_content = build_user_block(
+        c_d=c_d,
+        alt=alt,
+        K=K,
+        optional_fields=optional_fields,
+    )
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT_TRAVEL_ANCHORED},
         {"role": "user", "content": user_content},
     ]
 
@@ -664,6 +867,18 @@ __all__ = [
     "MOBILITY_ANCHORED_AXES",
     "SYSTEM_PROMPT_MOBILITY_ANCHORED",
     "build_messages_mobility_anchored",
+    "PROMPT_VERSION_HOTEL_ANCHORED",
+    "HOTEL_ANCHORED_AXES",
+    "SYSTEM_PROMPT_HOTEL_ANCHORED",
+    "build_messages_hotel_anchored",
+    "PROMPT_VERSION_TRAVEL_ANCHORED",
+    "TRAVEL_ANCHORED_AXES",
+    "SYSTEM_PROMPT_TRAVEL_ANCHORED",
+    "build_messages_travel_anchored",
+    "PROMPT_VERSION_MODECHOICE_ANCHORED",
+    "MODECHOICE_ANCHORED_AXES",
+    "SYSTEM_PROMPT_MODECHOICE_ANCHORED",
+    "build_messages_modechoice_anchored",
     "build_system_prompt",
     "build_user_block",
     "build_messages",

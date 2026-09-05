@@ -153,14 +153,23 @@ def head_naming_report(
         if effective_top_n == 0:
             top_outcomes_per_head[f"m{m}"] = []
             continue
-        # torch.topk returns values and indices sorted descending by value.
-        top = torch.topk(scores_m, k=effective_top_n, largest=True, sorted=True)
-        vals = top.values.tolist()
-        idxs = top.indices.tolist()
-        top_outcomes_per_head[f"m{m}"] = [
-            {"score": float(vals[i]), "outcome": flat_strings[idxs[i]]}
-            for i in range(effective_top_n)
-        ]
+        # The same outcome string recurs across events (cache hits for the
+        # same (customer, alternative) pair and identical generations), and
+        # identical strings have identical embeddings and hence identical
+        # scores. Rank everything, then keep the first occurrence of each
+        # distinct string so the top-N reads as N different outcomes.
+        order = torch.argsort(scores_m, descending=True).tolist()
+        seen: set[str] = set()
+        rows: list[dict[str, Any]] = []
+        for idx in order:
+            s = flat_strings[idx]
+            if s in seen:
+                continue
+            seen.add(s)
+            rows.append({"score": float(scores_m[idx].item()), "outcome": s})
+            if len(rows) >= effective_top_n:
+                break
+        top_outcomes_per_head[f"m{m}"] = rows
 
     return {
         "head_names": resolved_names,
@@ -275,15 +284,26 @@ def dominant_attribute_report(
         }``
     """
     raw = dominant_attribute_breakdown(logits, c_star, intermediates)
+    M = int(intermediates.A.shape[-1])
 
-    by_dom: dict[str, dict[str, float]] = {}
+    # ``stratify_by_key`` omits empty groups, so a head that is never the
+    # §12.3 argmax on this batch used to vanish from the report entirely
+    # (the "not every head reports a value" symptom). Emit every head:
+    # absent ones carry ``n = 0`` and ``None`` metrics so a reader can
+    # tell "never dominant" from "missing".
+    by_dom: dict[str, dict[str, float | None]] = {}
     n_by: dict[str, int] = {}
-    # Keys from strata are plain Python ints (attribute indices).
-    for k, metrics in raw.items():
-        # Defensive: the strata module casts numpy keys via .item(); we ensure
-        # a consistent "m{idx}" string key for JSON stability.
-        idx = int(k)
+    metric_names: list[str] = []
+    for metrics in raw.values():
+        metric_names = [mk for mk in metrics if mk != "n"]
+        break
+    for idx in range(M):
         head_key = f"m{idx}"
+        metrics = raw.get(idx)
+        if metrics is None:
+            by_dom[head_key] = {mk: None for mk in metric_names}
+            n_by[head_key] = 0
+            continue
         # Split off the "n" count so the metrics dict is pure scores.
         metrics_copy = {mk: mv for mk, mv in metrics.items() if mk != "n"}
         # Cast numeric values to plain floats for JSON serialization.
@@ -499,11 +519,22 @@ def run_all_reports(
         label=counterfactual_label,
     )
 
+    # Head-collapse diagnostics: are the M heads aligned with the K prompt
+    # slots (anchored prompts) or scaled copies of one another?
+    from src.train.regularizers import head_slot_alignment_diagnostics
+
+    report_align = head_slot_alignment_diagnostics(intermediates.A)
+    report_align["head_names"] = (
+        list(head_names)[: intermediates.A.shape[-1]]
+        if head_names is not None else list(DEFAULT_HEAD_NAMES)[: intermediates.A.shape[-1]]
+    )
+
     bundle: dict[str, Any] = {
         "head_naming": report_head,
         "per_decision": report_dec,
         "dominant_attribute": report_dom,
         "counterfactual": report_cf,
+        "head_alignment": report_align,
     }
 
     if out_dir is not None:
@@ -514,6 +545,7 @@ def run_all_reports(
             "per_decision": "per_decision.json",
             "dominant_attribute": "dominant_attribute.json",
             "counterfactual": "counterfactual.json",
+            "head_alignment": "head_alignment.json",
         }
         for key, fname in filename_by_key.items():
             (out_path / fname).write_text(json.dumps(bundle[key], indent=2))

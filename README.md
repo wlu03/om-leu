@@ -24,10 +24,15 @@ build log, deviations from spec, and unresolved ambiguities.
 
 ## Data
 
-Source data lives in `amazon_ecom/` (Amazon purchase logs + survey).
+Each dataset lives in its own top-level directory: `<name>/data` (raw and prepared files), `<name>/results` (run outputs) and `<name>/cache` (outcomes / embeddings sqlite), for `amazon`, `mobility_boston`, `expedia_rectour` and `swissmetro`. Only `amazon/data/fields.csv` is versioned.
 Upstream v2.0 pipeline stages (load/clean/survey-join/state-features/split)
 are referenced at their interfaces only — not reimplemented here.
 `src/train/subsample.py` is retained verbatim from v1 (Appendix C).
+
+Additional datasets: `mobility_boston` (see `configs/datasets/mobility_boston.yaml`)
+and `expedia_rectour` — Expedia RecTour lodging searches with real displayed
+slates and an open-weight generator on Modal; see
+[`docs/expedia_rectour.md`](docs/expedia_rectour.md); `swissmetro` — the public Biogeme SP mode-choice survey, see [`docs/swissmetro.md`](docs/swissmetro.md).
 
 ## Layout
 
