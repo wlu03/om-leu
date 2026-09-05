@@ -12,6 +12,9 @@ REGISTRY = {
     "mnl_only": ("experiments.models.baseline", "build_mnl_only"),
     "hybrid_base": ("experiments.models.baseline", "build_hybrid_base"),
 }
+# boosted-residual variants (experiments/models/boost.py); other configs there are kept but unregistered
+REGISTRY.update({name: ("experiments.models.boost", f"build_{name}") for name in (
+    "boost_v2", "boost_v2_sem", "boost_v3", "boost_v3_sem")})
 
 
 def get(name: str):
