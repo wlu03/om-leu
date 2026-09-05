@@ -11,6 +11,9 @@ from importlib import import_module
 REGISTRY = {
     "mnl_only": ("experiments.models.baseline", "build_mnl_only"),
     "hybrid_base": ("experiments.models.baseline", "build_hybrid_base"),
+    # heterogeneous / panel-aware structural part (experiments/models/hetero.py)
+    "hetero_v1": ("experiments.models.hetero", "build_hetero_v1"),
+    "hetero_v2": ("experiments.models.hetero", "build_hetero_v2"),
 }
 # boosted-residual variants (experiments/models/boost.py); other configs there are kept but unregistered
 REGISTRY.update({name: ("experiments.models.boost", f"build_{name}") for name in (
