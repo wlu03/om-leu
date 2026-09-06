@@ -92,7 +92,11 @@ class Config:
     sentence_control: str = ""          # "" | "random" (E ~ N(0,1)) | "altid" (E = one-hot alternative identity)
     cold_start: bool = False            # drop the training rows of persons who appear in val/test (no panel)
     no_hist: bool = False               # zero the history features (is_repeat, purchase_count) everywhere
-    pi_input: str = ""                  # "" scalar pi | "Z": pi_i = sigmoid(gamma + w . Z_i), w L2-penalised, stacked on val
+    pi_input: str = ""                  # "" scalar pi | "Z": covariate gate | "S": uncertainty gate on [H_struct, H_sem, member disagreement]
+    pi_fit: str = "val"                 # "val" L-BFGS on validation | "boot": bootstrap-median on validation | "oof": stacked on
+                                        # person-grouped out-of-fold predictions over train+val (Wolpert / super-learner stacking)
+    oof_pi_folds: int = 5
+    pi_boot: int = 100
     pi_l2: float = 1.0                  # ridge on w (per validation event) for the covariate gate
     slot_keep: Tuple[int, ...] = ()     # members see only these sentence slots (others zeroed); () = all K
 
@@ -382,7 +386,8 @@ class Omleu2(nn.Module):
         self.members = nn.ModuleList()
         self.gamma = nn.Parameter(torch.tensor(-6.0))                    # pi = sigmoid(gamma) ~ 0.0025 at init
         self.log_a = nn.Parameter(torch.zeros(()))
-        self.w_pi = nn.Parameter(torch.zeros(b.P)) if cfg.pi_input == "Z" else None   # covariate-dependent gate
+        self.w_pi = nn.Parameter(torch.zeros({"Z": b.P, "S": 3}.get(cfg.pi_input, 0))) if cfg.pi_input in ("Z", "S") else None
+        self._sfeat_stats = None
         self.sem_view: Optional[Bundle] = None                            # sentence-control / data view for the members
         self.data_view: Optional[Bundle] = None                           # cold-start / no-history view (informational)
 
@@ -390,11 +395,28 @@ class Omleu2(nn.Module):
     def pi(self) -> torch.Tensor:
         return torch.sigmoid(self.gamma)
 
+    def unc_features(self, b: Bundle, idx: torch.Tensor) -> torch.Tensor:
+        """[structural entropy, semantic entropy, member disagreement] per event, standardised on val."""
+        bb = self.sem_view if self.sem_view is not None else b
+        with torch.no_grad():
+            Lp = torch.log_softmax(self.U[idx], -1)
+            M = torch.stack([m(bb, idx) for m in self.members], 1)               # (n, M, J)
+            Sp = _log_mean_exp(M, 1)
+            h_s = -(Lp.exp() * Lp).sum(-1)
+            h_m = -(Sp.exp() * Sp).sum(-1)
+            dis = M.exp().std(1).mean(-1)                                        # disagreement of member probabilities
+            f = torch.stack([h_s, h_m, dis], 1)
+        if self._sfeat_stats is None:
+            self._sfeat_stats = (f.mean(0), f.std(0) + 1e-6)
+        mu, sd = self._sfeat_stats
+        return (f - mu) / sd
+
     def pi_of(self, b: Bundle, idx: torch.Tensor) -> torch.Tensor:
-        """Mixture weight per event: scalar, or a logistic function of the person covariates."""
+        """Mixture weight per event: scalar, or a logistic function of covariates / uncertainty features."""
         if self.w_pi is None:
             return self.pi.expand(len(idx))
-        return torch.sigmoid(self.gamma + b.Z[idx] @ self.w_pi)
+        feats = b.Z[idx] if self.cfg.pi_input == "Z" else self.unc_features(b, idx)
+        return torch.sigmoid(self.gamma + feats @ self.w_pi)
 
     def forward(self, b: Bundle, idx: torch.Tensor) -> torch.Tensor:
         a = self.log_a.exp() if self.cfg.temp else 1.0
@@ -416,22 +438,91 @@ class Omleu2(nn.Module):
         if not scalars:
             return nll_on(self, b, va)
         l2 = self.cfg.pi_l2
+        if self.cfg.pi_input == "S":
+            self._sfeat_stats = None
+            self.unc_features(b, va)                                             # fix standardisation on validation
 
-        def loss():
-            l = F.cross_entropy(self(b, va), b.y[va])
+        def loss(sel=va):
+            l = F.cross_entropy(self(b, sel), b.y[sel])
             if self.w_pi is not None:
-                l = l + l2 * (self.w_pi ** 2).sum() / len(va)
+                l = l + l2 * (self.w_pi ** 2).sum() / len(sel)
             return l
+        if self.cfg.pi_fit == "boot":
+            # bootstrap the validation events, refit the scalars each time, keep the median: a
+            # small-sample shrinkage against pi overshooting on a few hundred validation events
+            g = torch.Generator().manual_seed(1234)
+            fits = []
+            for _ in range(self.cfg.pi_boot):
+                sel = va[torch.randint(0, len(va), (len(va),), generator=g)]
+                for p_ in scalars:
+                    p_.data.zero_()
+                self.gamma.data.fill_(-6.0)
+                lbfgs_prefit(lambda: loss(sel), scalars, max_iter=100)
+                fits.append([p_.detach().clone() for p_ in scalars])
+            for k, p_ in enumerate(scalars):
+                p_.data.copy_(torch.stack([f[k] for f in fits]).median(0).values)
+            return nll_on(self, b, va)
         lbfgs_prefit(loss, scalars, max_iter=200)
         return nll_on(self, b, va)
 
 
-def _build(b: Bundle, seed: int, cfg: Config):
+def _fit_scalars_oof(model: "Omleu2", b: Bundle, seed: int, cfg: Config, view: str) -> Dict:
+    """Stack pi (and the temperature) on out-of-fold predictions: split the persons of train+val into
+    K folds; for each fold run the full pipeline (pi_fit='val') on the complement with that fold as its
+    validation split, and record the fold's structural log-probabilities and semantic log-probabilities.
+    Then fit the scalars by L-BFGS on the pooled out-of-fold predictions (K times more persons than a
+    single validation split) and copy them into ``model`` (whose stages were fitted on the full train)."""
+    K = cfg.oof_pi_folds
+    pool = torch.cat([b.idx("train"), b.idx("val")])
+    persons = b.person[pool].unique()
+    g = torch.Generator().manual_seed(seed + 7)
+    if cfg.cold_start:
+        # cold-start regime: folds must hold out whole persons so the fold matches the test regime
+        fold_of = torch.zeros(int(persons.max()) + 1, dtype=torch.long)
+        fold_of[persons[torch.randperm(len(persons), generator=g)]] = torch.arange(len(persons)) % K
+        fold_row = fold_of[b.person[pool]]
+    else:
+        # warm (chronological) regime: hold out events, keeping every person's other events in
+        # the fold's training data, so the fold matches a test split that shares respondents
+        fold_row = torch.randperm(len(pool), generator=g) % K
+    sub_cfg = dataclasses.replace(cfg, pi_fit="val", cold_start=False, no_hist=False)   # views already applied to b
+    Ls, Ss, ys = [], [], []
+    for k in range(K):
+        split = b.split.clone()
+        held = pool[fold_row == k]
+        split[pool] = 0
+        split[held] = 1
+        fb = dataclasses.replace(b, split=split)
+        m_k, run_k = _build(fb, seed, sub_cfg, view_tag=f"{view}oof{k}")
+        run_k(m_k, fb, seed)
+        idx = fb.idx("val")
+        with torch.no_grad():
+            Lp = torch.log_softmax(m_k.U[idx], -1)
+            bb = m_k.sem_view if m_k.sem_view is not None else fb
+            Sp = _log_mean_exp(torch.stack([m(bb, idx) for m in m_k.members], 1), 1)
+        Ls.append(Lp); Ss.append(Sp); ys.append(fb.y[idx])
+    L, S, y = torch.cat(Ls), torch.cat(Ss), torch.cat(ys)
+    gamma, log_a = model.gamma, model.log_a
+    gamma.data.fill_(-6.0); log_a.data.zero_()
+
+    def loss():
+        a = log_a.exp() if cfg.temp else 1.0
+        Lp = torch.log_softmax(a * L, -1)
+        pi = torch.sigmoid(gamma)
+        lp = torch.logaddexp(torch.log1p(-pi) + Lp, torch.log(pi) + S)
+        return F.cross_entropy(lp, y)
+    scalars = [gamma] + ([log_a] if cfg.temp else [])
+    nll = lbfgs_prefit(loss, scalars, max_iter=200)
+    return {"folds": K, "n_oof_events": int(len(y)), "n_oof_persons": int(len(persons)), "oof_nll_at_fit": float(loss()),
+            "oof_nll_struct_only": float(F.cross_entropy(L, y)), "oof_nll_sem_only": float(F.cross_entropy(S, y))}
+
+
+def _build(b: Bundle, seed: int, cfg: Config, view_tag: str = ""):
     model = Omleu2(b, cfg)
 
     def run(model: Omleu2, b: Bundle, seed: int) -> Dict:
         t0 = time.time()
-        view = ("cold," if cfg.cold_start else "") + ("nohist," if cfg.no_hist else "")
+        view = ("cold," if cfg.cold_start else "") + ("nohist," if cfg.no_hist else "") + view_tag
         if cfg.cold_start:
             b = cold_start_view(b, seed)
         if cfg.no_hist:
@@ -473,7 +564,12 @@ def _build(b: Bundle, seed: int, cfg: Config):
             model.members = nn.ModuleList(mems)
             model.sem_view = sb if (cfg.shuffle_sentences or cfg.sentence_control or view or cfg.slot_keep) else None
             info["stage3"] = minfo
-        val_nll = model.stack_on_val(b)
+        if cfg.pi_fit == "oof" and cfg.members:
+            oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+            info["oof_stacking"] = oof_info
+            val_nll = nll_on(model, b, b.idx("val"))
+        else:
+            val_nll = model.stack_on_val(b)
         extra = {**info, "cfg": dataclasses.asdict(cfg), "tau": tau, "pi": float(model.pi), "temp_a": float(model.log_a.exp()),
                  "gate": float(model.pi)}
         if model.w_pi is not None:
@@ -523,6 +619,8 @@ build_abl_cold_start_linear = make_builder(cold_start=True, struct=LIN, boost_of
 build_abl_cold_start_linear_boost = make_builder(cold_start=True, struct=LIN)
 build_abl_cold_start_linear_full = make_builder(**FULL, cold_start=True, struct=LIN)
 
+
+
 # --- LLM-signal experiments (docs/llm_signal_research.md) ---
 COLD = dict(cold_start=True, struct=(("person", False),))
 build_llm_cold_shuffled = make_builder(**FULL, **COLD, shuffle_sentences=True)
@@ -531,6 +629,14 @@ build_llm_cold_random = make_builder(**FULL, **COLD, sentence_control="random")
 build_llm_gate_z = make_builder(**FULL, pi_input="Z")
 build_llm_cold_gate_z = make_builder(**FULL, **COLD, pi_input="Z")
 build_llm_gate_z_strong = make_builder(**FULL, pi_input="Z", pi_l2=20.0)
+# --- pi-estimation robustness and uncertainty gate (why control gains != realised gains) ---
+build_pi_boot = make_builder(**FULL, pi_fit="boot")
+build_pi_cold_boot = make_builder(**FULL, **COLD, pi_fit="boot")
+build_pi_unc_gate = make_builder(**FULL, pi_input="S", pi_l2=5.0)
+build_pi_cold_unc_gate = make_builder(**FULL, **COLD, pi_input="S", pi_l2=5.0)
+build_pi_cold_unc_gate_boot = make_builder(**FULL, **COLD, pi_input="S", pi_l2=5.0, pi_fit="boot")
+build_pi_oof = make_builder(**FULL, pi_fit="oof")
+build_pi_cold_oof = make_builder(**FULL, **COLD, pi_fit="oof")
 build_llm_cold_gate_z_strong = make_builder(**FULL, **COLD, pi_input="Z", pi_l2=20.0)
 for _k, _name in enumerate(("financial", "time", "comfort", "convenience", "reliability")):
     globals()[f"build_llm_slot_{_name}"] = make_builder(**FULL, slot_keep=(_k,))
