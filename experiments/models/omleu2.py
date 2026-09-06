@@ -473,3 +473,8 @@ build_abl_altid_sentences = make_builder(**FULL, sentence_control="altid")
 build_abl_cold_start = make_builder(**FULL, cold_start=True, struct=(("person", False),))
 build_abl_cold_start_struct = make_builder(cold_start=True, struct=(("person", False),))
 build_abl_no_hist = make_builder(**FULL, no_hist=True)
+# person-level re-split protocol: the within-protocol ladder MNL -> MNL + trees -> hetero + trees -> + semantic
+LIN = (("person", False), ("taste", False), ("intercepts", False))
+build_abl_cold_start_linear = make_builder(cold_start=True, struct=LIN, boost_off=True)
+build_abl_cold_start_linear_boost = make_builder(cold_start=True, struct=LIN)
+build_abl_cold_start_linear_full = make_builder(**FULL, cold_start=True, struct=LIN)
