@@ -28,6 +28,9 @@ REGISTRY = {
 # boosted-residual variants (experiments/models/boost.py)
 REGISTRY.update({name: ("experiments.models.boost", f"build_{name}") for name in (
     "boost_v2", "boost_v2_sem", "boost_v3", "boost_v3_sem")})
+# OM-LEU 2: hetero_v1 structural part -> boosted residual -> semantic mixture (experiments/models/omleu2.py)
+REGISTRY.update({name: ("experiments.models.omleu2", f"build_{name}") for name in (
+    "combo_struct", "combo_struct_cal", "combo_full", "combo_full_ncat", "combo_struct_ncat", "combo_struct_insample")})
 
 
 def get(name: str):
