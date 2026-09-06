@@ -43,7 +43,7 @@ def main() -> None:
                 try:
                     model, run = get(name)(b, seed)
                     info = run(model, b, seed)
-                    m = evaluate(model, b, "test")
+                    m = evaluate(model, getattr(model, "data_view", None) or b, "test")   # data views re-split
                 except Exception:
                     err = traceback.format_exc(); print(f"[{dataset} s{seed}] {name}: FAILED\n{err}")
                     out.write_text(json.dumps({"model": name, "dataset": dataset, "seed": seed, "error": err}))

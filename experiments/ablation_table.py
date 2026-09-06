@@ -54,9 +54,9 @@ def load(variant: str, ds: str):
 
 
 def paired(a: dict, b: dict):
-    seeds = sorted(set(a) & set(b))
+    seeds = [s for s in sorted(set(a) & set(b)) if len(a[s]["per_event_nll"]) == len(b[s]["per_event_nll"])]
     if not seeds:
-        return None
+        return None   # e.g. the cold-start re-split has a different test set
     d = np.concatenate([np.array(a[s]["per_event_nll"]) - np.array(b[s]["per_event_nll"]) for s in seeds])
     rng = np.random.default_rng(0)
     boots = np.array([d[rng.integers(0, len(d), len(d))].mean() for _ in range(2000)])
@@ -75,7 +75,7 @@ def main() -> None:
             m = lambda k: np.mean([x[k] for x in r.values()])
             pi = np.mean([x.get("extra", {}).get("pi", np.nan) for x in r.values()])
             tau = np.mean([x.get("extra", {}).get("tau", np.nan) for x in r.values()])
-            p = paired(r, ref) if variant != REF else None
+            p = paired(r, ref) if (variant != REF and "cold_start" not in variant) else None   # re-split rows are unpaired
             dtxt = "" if p is None else f"{p[0]:+.3f} [{p[1]:+.3f}, {p[2]:+.3f}]{'*' if (p[1] > 0 or p[2] < 0) else ''}"
             lines.append(f"| {label} | {len(r)} | {m('top1')*100:.1f}% | {m('nll'):.4f} | {m('brier'):.3f} | {m('ece'):.3f} | {dtxt} | "
                          f"{'' if np.isnan(pi) else f'{pi:.2f}'} | {'' if np.isnan(tau) else f'{tau:.2f}'} |")

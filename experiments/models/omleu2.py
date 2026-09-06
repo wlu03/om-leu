@@ -287,14 +287,16 @@ def control_view(b: Bundle, kind: str, seed: int) -> Bundle:
     return dataclasses.replace(b, E=_ConstE(b, kind, seed))
 
 
-def cold_start_view(b: Bundle) -> Bundle:
-    """Training rows of persons who also appear in val or test are held out of every split."""
-    tr, held = b.idx("train"), torch.zeros(b.N, dtype=torch.bool)
-    seen = torch.zeros(b.n_persons, dtype=torch.bool)
-    seen[b.person[torch.cat([b.idx("val"), b.idx("test")])]] = True
-    held[tr[seen[b.person[tr]]]] = True
-    split = b.split.clone(); split[held] = 3
-    return dataclasses.replace(b, split=split)
+def cold_start_view(b: Bundle, seed: int) -> Bundle:
+    """Person-level re-split (70 / 15 / 15 of persons, seeded): no person appears in two splits.
+    The test set differs from the paired protocol, so these runs are only comparable with each other."""
+    g = torch.Generator().manual_seed(seed + 31)
+    persons = torch.randperm(b.n_persons, generator=g)
+    n_val = n_te = int(round(0.15 * b.n_persons))
+    part = torch.zeros(b.n_persons, dtype=torch.int8)
+    part[persons[:n_te]] = 2
+    part[persons[n_te:n_te + n_val]] = 1
+    return dataclasses.replace(b, split=part[b.person])
 
 
 def no_hist_view(b: Bundle) -> Bundle:
@@ -394,7 +396,7 @@ def _build(b: Bundle, seed: int, cfg: Config):
         t0 = time.time()
         view = ("cold," if cfg.cold_start else "") + ("nohist," if cfg.no_hist else "")
         if cfg.cold_start:
-            b = cold_start_view(b)
+            b = cold_start_view(b, seed)
         if cfg.no_hist:
             b = no_hist_view(b)
         model.data_view = b if view else None
@@ -468,6 +470,6 @@ build_abl_members1 = make_builder(members=1, temp=True)
 build_abl_shuffled_sentences = make_builder(**FULL, shuffle_sentences=True)
 build_abl_random_embeddings = make_builder(**FULL, sentence_control="random")
 build_abl_altid_sentences = make_builder(**FULL, sentence_control="altid")
-build_abl_cold_start = make_builder(**FULL, cold_start=True)
-build_abl_cold_start_struct = make_builder(cold_start=True)
+build_abl_cold_start = make_builder(**FULL, cold_start=True, struct=(("person", False),))
+build_abl_cold_start_struct = make_builder(cold_start=True, struct=(("person", False),))
 build_abl_no_hist = make_builder(**FULL, no_hist=True)
