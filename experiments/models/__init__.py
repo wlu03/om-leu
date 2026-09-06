@@ -34,7 +34,9 @@ REGISTRY.update({name: ("experiments.models.omleu2", f"build_{name}") for name i
     "abl_no_person", "abl_no_taste", "abl_no_intercepts", "abl_linear_struct", "abl_restarts1", "abl_no_boost",
     "abl_boost_nomono", "abl_boost_additive", "abl_tau1_insample", "abl_members1", "abl_shuffled_sentences",
     "abl_random_embeddings", "abl_altid_sentences", "abl_cold_start", "abl_cold_start_struct", "abl_no_hist",
-    "abl_cold_start_linear", "abl_cold_start_linear_boost", "abl_cold_start_linear_full")})
+    "abl_cold_start_linear", "abl_cold_start_linear_boost", "abl_cold_start_linear_full",
+    "llm_cold_shuffled", "llm_cold_altid", "llm_cold_random", "llm_gate_z", "llm_cold_gate_z", "llm_gate_z_strong", "llm_cold_gate_z_strong")
+    + tuple(f"llm_{p}slot_{n}" for p in ("", "cold_") for n in ("financial", "time", "comfort", "convenience", "reliability"))})
 
 
 def get(name: str):

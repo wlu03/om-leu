@@ -92,6 +92,9 @@ class Config:
     sentence_control: str = ""          # "" | "random" (E ~ N(0,1)) | "altid" (E = one-hot alternative identity)
     cold_start: bool = False            # drop the training rows of persons who appear in val/test (no panel)
     no_hist: bool = False               # zero the history features (is_repeat, purchase_count) everywhere
+    pi_input: str = ""                  # "" scalar pi | "Z": pi_i = sigmoid(gamma + w . Z_i), w L2-penalised, stacked on val
+    pi_l2: float = 1.0                  # ridge on w (per validation event) for the covariate gate
+    slot_keep: Tuple[int, ...] = ()     # members see only these sentence slots (others zeroed); () = all K
 
 
 @dataclass
@@ -287,6 +290,22 @@ def control_view(b: Bundle, kind: str, seed: int) -> Bundle:
     return dataclasses.replace(b, E=_ConstE(b, kind, seed))
 
 
+class _SlotE:
+    """Lazy E view that zeroes every sentence slot except ``keep`` (per-axis ablation)."""
+
+    def __init__(self, E, keep: Tuple[int, ...]):
+        self._E, self.shape = E, E.shape
+        m = torch.zeros(E.shape[2]); m[list(keep)] = 1.0
+        self._mask = m[None, None, :, None]
+
+    def __getitem__(self, idx):
+        return self._E[idx] * self._mask
+
+
+def slot_view(b: Bundle, keep: Tuple[int, ...]) -> Bundle:
+    return dataclasses.replace(b, E=_SlotE(b.E, keep))
+
+
 def cold_start_view(b: Bundle, seed: int) -> Bundle:
     """Person-level re-split (70 / 15 / 15 of persons, seeded): no person appears in two splits.
     The test set differs from the paired protocol, so these runs are only comparable with each other."""
@@ -363,12 +382,19 @@ class Omleu2(nn.Module):
         self.members = nn.ModuleList()
         self.gamma = nn.Parameter(torch.tensor(-6.0))                    # pi = sigmoid(gamma) ~ 0.0025 at init
         self.log_a = nn.Parameter(torch.zeros(()))
+        self.w_pi = nn.Parameter(torch.zeros(b.P)) if cfg.pi_input == "Z" else None   # covariate-dependent gate
         self.sem_view: Optional[Bundle] = None                            # sentence-control / data view for the members
         self.data_view: Optional[Bundle] = None                           # cold-start / no-history view (informational)
 
     @property
     def pi(self) -> torch.Tensor:
         return torch.sigmoid(self.gamma)
+
+    def pi_of(self, b: Bundle, idx: torch.Tensor) -> torch.Tensor:
+        """Mixture weight per event: scalar, or a logistic function of the person covariates."""
+        if self.w_pi is None:
+            return self.pi.expand(len(idx))
+        return torch.sigmoid(self.gamma + b.Z[idx] @ self.w_pi)
 
     def forward(self, b: Bundle, idx: torch.Tensor) -> torch.Tensor:
         a = self.log_a.exp() if self.cfg.temp else 1.0
@@ -377,16 +403,27 @@ class Omleu2(nn.Module):
             return Lp
         bb = self.sem_view if self.sem_view is not None else b
         Sp = _log_mean_exp(torch.stack([m(bb, idx) for m in self.members], 1), 1)
-        return torch.logaddexp(torch.log1p(-self.pi) + Lp, torch.log(self.pi) + Sp)
+        pi = self.pi_of(b, idx)[:, None]
+        return torch.logaddexp(torch.log1p(-pi) + Lp, torch.log(pi) + Sp)
 
     def stack_on_val(self, b: Bundle) -> float:
         """Fit (gamma, log_a) on the validation split by L-BFGS; returns the validation NLL."""
         scalars = ([self.gamma] if len(self.members) else []) + ([self.log_a] if self.cfg.temp else [])
+        if self.w_pi is not None and len(self.members):
+            scalars.append(self.w_pi)
         va = b.idx("val")
         self.eval()
         if not scalars:
             return nll_on(self, b, va)
-        return lbfgs_prefit(lambda: F.cross_entropy(self(b, va), b.y[va]), scalars, max_iter=200)
+        l2 = self.cfg.pi_l2
+
+        def loss():
+            l = F.cross_entropy(self(b, va), b.y[va])
+            if self.w_pi is not None:
+                l = l + l2 * (self.w_pi ** 2).sum() / len(va)
+            return l
+        lbfgs_prefit(loss, scalars, max_iter=200)
+        return nll_on(self, b, va)
 
 
 def _build(b: Bundle, seed: int, cfg: Config):
@@ -429,14 +466,21 @@ def _build(b: Bundle, seed: int, cfg: Config):
             sb = shuffled_view(b, seed) if cfg.shuffle_sentences else b
             if cfg.sentence_control:
                 sb = control_view(sb, cfg.sentence_control, seed)
+            if cfg.slot_keep:
+                sb = slot_view(sb, cfg.slot_keep)
             mems, minfo = semantic_members(sb, seed, cfg.members, shuffled=cfg.shuffle_sentences,
-                                           view=view + cfg.sentence_control)
+                                           view=view + cfg.sentence_control + (f"slots{cfg.slot_keep}" if cfg.slot_keep else ""))
             model.members = nn.ModuleList(mems)
-            model.sem_view = sb if (cfg.shuffle_sentences or cfg.sentence_control or view) else None
+            model.sem_view = sb if (cfg.shuffle_sentences or cfg.sentence_control or view or cfg.slot_keep) else None
             info["stage3"] = minfo
         val_nll = model.stack_on_val(b)
         extra = {**info, "cfg": dataclasses.asdict(cfg), "tau": tau, "pi": float(model.pi), "temp_a": float(model.log_a.exp()),
                  "gate": float(model.pi)}
+        if model.w_pi is not None:
+            with torch.no_grad():
+                pv = model.pi_of(b, b.idx("test"))
+            extra["pi_test"] = {"mean": float(pv.mean()), "p10": float(pv.quantile(0.1)), "p90": float(pv.quantile(0.9))}
+            extra["pi_weights"] = {n: float(w) for n, w in sorted(zip(b.meta["z_names"], model.w_pi.detach()), key=lambda t: -abs(t[1]))[:8]}
         return {"fit": {"best_epoch": best[3]["best_round"], "best_val_nll": val_nll, "boost_val_nll": best[0],
                         "stage1_val_nll": s1.info["stage1_val_nll"], "epochs": 0, "seconds": time.time() - t0},
                 "extra": extra}
@@ -478,3 +522,16 @@ LIN = (("person", False), ("taste", False), ("intercepts", False))
 build_abl_cold_start_linear = make_builder(cold_start=True, struct=LIN, boost_off=True)
 build_abl_cold_start_linear_boost = make_builder(cold_start=True, struct=LIN)
 build_abl_cold_start_linear_full = make_builder(**FULL, cold_start=True, struct=LIN)
+
+# --- LLM-signal experiments (docs/llm_signal_research.md) ---
+COLD = dict(cold_start=True, struct=(("person", False),))
+build_llm_cold_shuffled = make_builder(**FULL, **COLD, shuffle_sentences=True)
+build_llm_cold_altid = make_builder(**FULL, **COLD, sentence_control="altid")
+build_llm_cold_random = make_builder(**FULL, **COLD, sentence_control="random")
+build_llm_gate_z = make_builder(**FULL, pi_input="Z")
+build_llm_cold_gate_z = make_builder(**FULL, **COLD, pi_input="Z")
+build_llm_gate_z_strong = make_builder(**FULL, pi_input="Z", pi_l2=20.0)
+build_llm_cold_gate_z_strong = make_builder(**FULL, **COLD, pi_input="Z", pi_l2=20.0)
+for _k, _name in enumerate(("financial", "time", "comfort", "convenience", "reliability")):
+    globals()[f"build_llm_slot_{_name}"] = make_builder(**FULL, slot_keep=(_k,))
+    globals()[f"build_llm_cold_slot_{_name}"] = make_builder(**FULL, **COLD, slot_keep=(_k,))
