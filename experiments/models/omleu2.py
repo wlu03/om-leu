@@ -84,6 +84,14 @@ class Config:
     ncat: bool = False                  # stage 1c concept residual
     members: int = 0                    # stage 3 semantic members (0: none)
     temp: bool = False                  # temperature a on the structural part, stacked on val
+    # --- ablation switches (hashable so they can key the stage caches) ---
+    struct: Tuple[Tuple[str, object], ...] = ()   # hetero overrides, e.g. (("person", False),), (("n_restarts", 1),)
+    boost: Tuple[Tuple[str, object], ...] = ()    # booster overrides, e.g. (("monotone", False),), (("additive", True),)
+    boost_off: bool = False             # skip stage 2 (U = stage-1 log-probabilities)
+    shuffle_sentences: bool = False     # control: members see outcome sentences of a random other event of the same alternative
+    sentence_control: str = ""          # "" | "random" (E ~ N(0,1)) | "altid" (E = one-hot alternative identity)
+    cold_start: bool = False            # drop the training rows of persons who appear in val/test (no panel)
+    no_hist: bool = False               # zero the history features (is_repeat, purchase_count) everywhere
 
 
 @dataclass
@@ -113,12 +121,13 @@ def _fold_ids(b: Bundle, folds: int, by_person: bool, seed: int) -> torch.Tensor
 
 
 def _cross_fit(b: Bundle, seed: int, folds: int, lam: Optional[float], wd: float,
-               by_person: bool) -> Tuple[torch.Tensor, Dict]:
+               by_person: bool, struct: Tuple[Tuple[str, object], ...] = ()) -> Tuple[torch.Tensor, Dict]:
     """Stage-1 log-probabilities on train rows from fold-complement fits (one restart, the
     selected person shrinkage and weight decay); zeros elsewhere."""
     tr = b.idx("train")
     fold = _fold_ids(b, folds, by_person, seed)
-    builder = make_hetero_builder(**HETERO_V1, n_restarts=1, net_wd=wd,
+    form = {**HETERO_V1, **{k: v for k, v in dict(struct).items() if k not in ("n_restarts", "net_wd")}}
+    builder = make_hetero_builder(**form, n_restarts=1, net_wd=wd,
                                   person_l2_grid=(lam,) if lam is not None else (0.0,))
     out = torch.zeros(b.N, b.J)
     fold_val = []
@@ -136,19 +145,22 @@ def _cross_fit(b: Bundle, seed: int, folds: int, lam: Optional[float], wd: float
     return out, {"folds": folds, "by_person": by_person, "fold_val_nll": fold_val}
 
 
-def structural_stage(b: Bundle, seed: int, oof_folds: int) -> StructuralStage:
-    key = (b.dataset, seed, oof_folds)
+def structural_stage(b: Bundle, seed: int, oof_folds: int,
+                     struct: Tuple[Tuple[str, object], ...] = (), view: str = "") -> StructuralStage:
+    key = (b.dataset, seed, oof_folds, struct, view)
     if key in _STRUCT_CACHE:
         return _STRUCT_CACHE[key]
     t0 = time.time()
-    model, run = build_hetero_v1(b, seed)
+    kw = {**HETERO_V1, "n_restarts": 5, "net_wd": 1e-2, **dict(struct)}
+    model, run = (build_hetero_v1 if not struct else make_hetero_builder(**kw))(b, seed)
     info = run(model, b, seed)
     ex = info["extra"]
     logits = F.log_softmax(all_logits(model, b), 1)
     offset = logits.clone()
     oof_info: Dict = {"folds": 0}
     if oof_folds > 0:
-        oof, oof_info = _cross_fit(b, seed, oof_folds, ex["person_l2"], ex["net_wd"], by_person=not ex["person_effects"])
+        oof, oof_info = _cross_fit(b, seed, oof_folds, ex["person_l2"], ex["net_wd"], by_person=not ex["person_effects"],
+                                   struct=struct)
         tr = b.idx("train")
         offset[tr] = oof[tr]
     va, tr = b.idx("val"), b.idx("train")
@@ -200,7 +212,8 @@ def concept_stage(b: Bundle, seed: int, stage1: StructuralStage) -> Tuple[torch.
 
 
 # ----------------------------------------------------------------------------- stage 2
-def boost_stage(b: Bundle, seed: int, init: torch.Tensor) -> Tuple[torch.Tensor, Dict]:
+def boost_stage(b: Bundle, seed: int, init: torch.Tensor,
+                boost: Tuple[Tuple[str, object], ...] = ()) -> Tuple[torch.Tensor, Dict]:
     """RUM-shaped boosted residual with ``init`` (N, J, record slot order) as the offset.
     Returns the residual utilities f (N, J, slot order) at the early-stopped round and fit info."""
     init_c = _canon(b, init).numpy().astype(np.float64)                 # (N, A)
@@ -217,6 +230,10 @@ def boost_stage(b: Bundle, seed: int, init: torch.Tensor) -> Tuple[torch.Tensor,
     ccfg = {"mode": "rum", "A": b.n_alts, "seed": seed, "use_init": True,
             **{k: BOOST_CFG[k] for k in ("lr", "num_leaves", "min_data", "lambda_l2", "feature_fraction",
                                          "bagging_fraction", "patience", "max_rounds", "num_threads", "additive", "monotone")}}
+    ccfg.update(dict(boost))
+    if not ccfg["monotone"]:
+        for a in range(b.n_alts):
+            payload[f"mono{a}"] = np.zeros_like(payload[f"mono{a}"])
     out = run_child(payload, ccfg)
     f_c = torch.zeros(b.N, b.n_alts, dtype=torch.float64)
     for s, ix in splits.items():
@@ -231,14 +248,81 @@ def boost_stage(b: Bundle, seed: int, init: torch.Tensor) -> Tuple[torch.Tensor,
     return f_c.float().gather(1, b.alt_idx), info
 
 
+# ----------------------------------------------------------------------------- controls
+class _ShuffledE:
+    """Lazy view of E where slot (i, j) returns the sentences of a random other event's slot that holds
+    the same canonical alternative and lies in the same split (train / val / test)."""
+
+    def __init__(self, E: torch.Tensor, src_i: torch.Tensor, src_j: torch.Tensor):
+        self._E, self._si, self._sj = E, src_i, src_j
+        self.shape = E.shape
+
+    def __getitem__(self, idx):
+        return self._E[self._si[idx], self._sj[idx]]
+
+
+class _ConstE:
+    """Lazy E view with no event-specific content: ``random`` draws a fixed N(0,1) tensor once
+    (seeded), ``altid`` returns the one-hot canonical alternative identity padded to d dims."""
+
+    def __init__(self, b: Bundle, kind: str, seed: int):
+        self.shape = b.E.shape
+        self.kind, self.alt_idx, self.d, self.K = kind, b.alt_idx, b.d, b.K
+        if kind == "random":
+            g = torch.Generator().manual_seed(seed + 4242)
+            self._E = torch.randn(b.N, b.J, b.K, b.d, generator=g, dtype=torch.float16)
+        elif kind == "altid":
+            self.A = b.n_alts
+        else:
+            raise ValueError(kind)
+
+    def __getitem__(self, idx):
+        if self.kind == "random":
+            return self._E[idx].float()
+        oh = F.one_hot(self.alt_idx[idx], self.A).float()                          # (n, J, A)
+        return F.pad(oh, (0, self.d - self.A))[:, :, None, :].expand(-1, -1, self.K, -1)
+
+
+def control_view(b: Bundle, kind: str, seed: int) -> Bundle:
+    return dataclasses.replace(b, E=_ConstE(b, kind, seed))
+
+
+def cold_start_view(b: Bundle) -> Bundle:
+    """Training rows of persons who also appear in val or test are held out of every split."""
+    tr, held = b.idx("train"), torch.zeros(b.N, dtype=torch.bool)
+    seen = torch.zeros(b.n_persons, dtype=torch.bool)
+    seen[b.person[torch.cat([b.idx("val"), b.idx("test")])]] = True
+    held[tr[seen[b.person[tr]]]] = True
+    split = b.split.clone(); split[held] = 3
+    return dataclasses.replace(b, split=split)
+
+
+def no_hist_view(b: Bundle) -> Bundle:
+    return dataclasses.replace(b, Xhist=torch.zeros_like(b.Xhist))
+
+
+def shuffled_view(b: Bundle, seed: int) -> Bundle:
+    g = torch.Generator().manual_seed(seed + 977)
+    src_i = torch.arange(b.N)[:, None].expand(b.N, b.J).clone()
+    src_j = torch.arange(b.J)[None, :].expand(b.N, b.J).clone()
+    for split in (0, 1, 2):
+        for a in range(b.n_alts):
+            pos = torch.nonzero((b.alt_idx == a) & (b.split[:, None] == split), as_tuple=False)   # (m, 2)
+            perm = pos[torch.randperm(len(pos), generator=g)]
+            src_i[pos[:, 0], pos[:, 1]] = perm[:, 0]
+            src_j[pos[:, 0], pos[:, 1]] = perm[:, 1]
+    return dataclasses.replace(b, E=_ShuffledE(b.E, src_i, src_j))
+
+
 # ----------------------------------------------------------------------------- stage 3
 def _pretrain_member(m: PrefBranch, b: Bundle, seed: int):
     probe = lambda m_, b_, s_: PREF_LAM_PROBE * F.cross_entropy(m.probe_logits(b_, s_), b_.y[s_])
     return fit(m, b, params=list(m.parameters()), seed=seed, extra_loss=probe, **PREF_TRAIN)
 
 
-def semantic_members(b: Bundle, seed: int, members: int) -> Tuple[List[PrefBranch], Dict]:
-    key = (b.dataset, seed, members)
+def semantic_members(b: Bundle, seed: int, members: int, shuffled: bool = False,
+                     view: str = "") -> Tuple[List[PrefBranch], Dict]:
+    key = (b.dataset, seed, members, shuffled, view)
     if key in _MEMBER_CACHE:
         return _MEMBER_CACHE[key]
     torch.manual_seed(seed)
@@ -277,6 +361,8 @@ class Omleu2(nn.Module):
         self.members = nn.ModuleList()
         self.gamma = nn.Parameter(torch.tensor(-6.0))                    # pi = sigmoid(gamma) ~ 0.0025 at init
         self.log_a = nn.Parameter(torch.zeros(()))
+        self.sem_view: Optional[Bundle] = None                            # sentence-control / data view for the members
+        self.data_view: Optional[Bundle] = None                           # cold-start / no-history view (informational)
 
     @property
     def pi(self) -> torch.Tensor:
@@ -287,7 +373,8 @@ class Omleu2(nn.Module):
         Lp = torch.log_softmax(a * self.U[idx], -1)
         if len(self.members) == 0:
             return Lp
-        Sp = _log_mean_exp(torch.stack([m(b, idx) for m in self.members], 1), 1)
+        bb = self.sem_view if self.sem_view is not None else b
+        Sp = _log_mean_exp(torch.stack([m(bb, idx) for m in self.members], 1), 1)
         return torch.logaddexp(torch.log1p(-self.pi) + Lp, torch.log(self.pi) + Sp)
 
     def stack_on_val(self, b: Bundle) -> float:
@@ -305,8 +392,14 @@ def _build(b: Bundle, seed: int, cfg: Config):
 
     def run(model: Omleu2, b: Bundle, seed: int) -> Dict:
         t0 = time.time()
+        view = ("cold," if cfg.cold_start else "") + ("nohist," if cfg.no_hist else "")
+        if cfg.cold_start:
+            b = cold_start_view(b)
+        if cfg.no_hist:
+            b = no_hist_view(b)
+        model.data_view = b if view else None
         va = b.idx("val")
-        s1 = structural_stage(b, seed, cfg.oof_folds)
+        s1 = structural_stage(b, seed, cfg.oof_folds, cfg.struct, view)
         model.structural = s1.model
         logits, offset = s1.logits, s1.offset
         info: Dict = {"stage1": s1.info}
@@ -316,8 +409,13 @@ def _build(b: Bundle, seed: int, cfg: Config):
             info["stage1c"] = ncat_info
         trials = {}
         best: Tuple[float, float, torch.Tensor, Dict] = (float("inf"), 0.0, torch.zeros(b.N, b.J), {})
-        for tau in cfg.tau_grid:
-            f, binfo = boost_stage(b, seed, tau * offset)
+        tau_grid = (1.0,) if cfg.boost_off else cfg.tau_grid
+        for tau in tau_grid:
+            if cfg.boost_off:
+                f, binfo = torch.zeros(b.N, b.J), {"best_val_nll": float(F.cross_entropy(logits[va], b.y[va])),
+                                                   "best_round": 0, "n_trees": 0, "importance": {}}
+            else:
+                f, binfo = boost_stage(b, seed, tau * offset, cfg.boost)
             trials[str(tau)] = {"val_nll": binfo["best_val_nll"], "best_round": binfo["best_round"]}
             if binfo["best_val_nll"] < best[0]:
                 best = (binfo["best_val_nll"], tau, f, binfo)
@@ -326,8 +424,13 @@ def _build(b: Bundle, seed: int, cfg: Config):
         info["stage2"] = {"tau": tau, "trials": trials, "init_val_nll": float(F.cross_entropy(tau * logits[va], b.y[va])),
                           **best[3]}
         if cfg.members:
-            mems, minfo = semantic_members(b, seed, cfg.members)
+            sb = shuffled_view(b, seed) if cfg.shuffle_sentences else b
+            if cfg.sentence_control:
+                sb = control_view(sb, cfg.sentence_control, seed)
+            mems, minfo = semantic_members(sb, seed, cfg.members, shuffled=cfg.shuffle_sentences,
+                                           view=view + cfg.sentence_control)
             model.members = nn.ModuleList(mems)
+            model.sem_view = sb if (cfg.shuffle_sentences or cfg.sentence_control or view) else None
             info["stage3"] = minfo
         val_nll = model.stack_on_val(b)
         extra = {**info, "cfg": dataclasses.asdict(cfg), "tau": tau, "pi": float(model.pi), "temp_a": float(model.log_a.exp()),
@@ -349,3 +452,22 @@ build_combo_full = make_builder(members=5, temp=True)
 build_combo_full_ncat = make_builder(members=5, temp=True, ncat=True)
 build_combo_struct_ncat = make_builder(ncat=True)
 build_combo_struct_insample = make_builder(oof_folds=0)
+
+# Ablations of the full model (combo_full minus one component; see docs/ablation_plan.md)
+FULL = dict(members=5, temp=True)
+build_abl_no_person = make_builder(**FULL, struct=(("person", False),))
+build_abl_no_taste = make_builder(**FULL, struct=(("taste", False),))
+build_abl_no_intercepts = make_builder(**FULL, struct=(("intercepts", False),))
+build_abl_linear_struct = make_builder(**FULL, struct=(("person", False), ("taste", False), ("intercepts", False)))
+build_abl_restarts1 = make_builder(**FULL, struct=(("n_restarts", 1),))
+build_abl_no_boost = make_builder(**FULL, boost_off=True)
+build_abl_boost_nomono = make_builder(**FULL, boost=(("monotone", False),))
+build_abl_boost_additive = make_builder(**FULL, boost=(("additive", True),))
+build_abl_tau1_insample = make_builder(**FULL, oof_folds=0, tau_grid=(1.0,))
+build_abl_members1 = make_builder(members=1, temp=True)
+build_abl_shuffled_sentences = make_builder(**FULL, shuffle_sentences=True)
+build_abl_random_embeddings = make_builder(**FULL, sentence_control="random")
+build_abl_altid_sentences = make_builder(**FULL, sentence_control="altid")
+build_abl_cold_start = make_builder(**FULL, cold_start=True)
+build_abl_cold_start_struct = make_builder(cold_start=True)
+build_abl_no_hist = make_builder(**FULL, no_hist=True)
