@@ -126,7 +126,7 @@ def main():
           "p = (1−π)·q + π·p̄ with that sentence channel. Δ is the paired per-event ΔNLL against `full_model` pooled over "
           "seeds with a 2000-draw bootstrap 95 % CI; `*` = CI excludes 0; negative = better than the reference. "
           "Plain-MLP baselines use exactly the same consequence sentences and embeddings as the full model.\n",
-          "Code: `ablation/<name>/model.py`; per-run JSON: `ablation/<name>/results/`; maths: `ablation/<name>/breakdown.md`; "
+          "**Interpretation: `ablation/FINDINGS.md`.** Code: `ablation/<name>/model.py`; per-run JSON: `ablation/<name>/results/`; maths: `ablation/<name>/breakdown.md`; "
           "runner: `ablation/run.py`; this file: `ablation/make_tables.py`.\n"]
     for proto, pi in combos:
         md.append(f"\n## {PROTO_LABEL[proto]} — {PI_LABEL[pi]}\n")
