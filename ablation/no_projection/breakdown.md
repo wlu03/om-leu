@@ -1,0 +1,11 @@
+**Problem:**  
+Remove the low-rank projection $W \in \mathbb{R}^{32 \times 768}$: the LayerNorm, attention, heads and probe act directly on the 768-dimensional embedding, $H_{ijk} = \mathrm{LN}(e_{ijk})$. What does the projection contribute, and why might removing it help rather than hurt?
+
+**Explanation:**  
+The projection has three roles. It reduces the number of parameters in every downstream map from $O(768)$ to $O(32)$ per head and per attention vector, which regularises; it gives the InfoNCE probe a small space in which to make the mean sentence discriminative, so that the heads receive a representation already aligned with choice; and it makes the member cheap. Without it the heads $a_m \in \mathbb{R}^{768}$, the salience vector $v \in \mathbb{R}^{768}$ and the probe $c \in \mathbb{R}^{768}$ are 24 times larger, and the LayerNorm now normalises the raw encoder output, whose scale is dominated by a few high-variance directions of the encoder.
+
+The parameter count argues for the projection. Two things argue against it. The encoder embeddings are already a good space for linear probing (that is what sentence encoders are trained for), so a linear head on the full embedding may extract information that a 32-dimensional bottleneck, trained on a few thousand events, throws away. And weight decay of $10^{-3}$ with early stopping is a strong enough regulariser that the extra parameters are not necessarily harmful; the member's effective capacity is set by the stopping epoch, not by its width.
+
+The ablation is therefore two-sided and the sign of the sentence-only $\Delta$ is the finding. A negative $\Delta$ (no projection better) says the bottleneck is too narrow and the member should use a wider $r$ or none; the mixture $\Delta$ then shows whether the extra sentence-only quality survives into the full system. A positive $\Delta$ says the bottleneck is doing useful regularisation. In the smoke test on Optima (seed 7, chronological) the no-projection member was better sentence-only by about 0.03 nats; the table over three seeds and datasets decides whether that is general.
+
+Notation and the full sentence model are in `ablation/full_model/breakdown.md`; the paired ΔNLL and its bootstrap interval are defined in `docs/math/05_paired_evaluation.md`.

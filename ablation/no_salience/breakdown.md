@@ -1,0 +1,11 @@
+**Problem:**  
+Replace the salience attention over the $K$ sentences by mean pooling: $h_{ij} = \frac{1}{K}\sum_k H_{ijk}$ instead of $\sum_k \alpha_{ijk} H_{ijk}$ with $\alpha_{ijk} \propto \exp(v^{\top} H_{ijk})$. What can the attention do that the mean cannot, and when would the ablation show no loss?
+
+**Explanation:**  
+Salience attention is a content-dependent convex combination of the projected sentences. It has $r = 32$ parameters (the vector $v$) and one degree of freedom per event and alternative: how much of the pooled vector comes from each of the five sentences. The mean is the special case $v = 0$. The attention can therefore express "for this alternative, the financial sentence is the informative one, the comfort sentence is boilerplate", and it does so from the sentence content, not from the slot position, because $v$ is shared across slots.
+
+Two facts limit how much this can buy. First, the projection $W$ and the probe are trained to make the mean projected sentence $\bar H_{ij}$ discriminative (the probe loss is on $\bar H_{ij}$ itself), so the model is already pushed toward a representation in which the mean works. Second, the heads are linear, so with mean pooling $A_{ijm} = \frac{1}{K}\sum_k a_m^{\top} H_{ijk} + b_m$ is a sum of per-sentence contributions; attention makes this sum weighted, which matters only when some sentences are misleading rather than merely uninformative (an uninformative sentence in a linear head contributes noise that the LayerNorm and weight decay already damp).
+
+If the sentence-only $\Delta$ is near zero, the five sentences are used roughly evenly and the earlier per-axis result (removing any one axis costs little except the financial axis on LPMC) is confirmed from the other direction. If the $\Delta$ is positive, the attention is doing real selection and the learned $\alpha$ should be reported by axis. The mixture $\Delta$ is again the smaller of the two, for the reason given in `no_person_weights`. A companion folder, `person_attention`, replaces $v$ by a query computed from $z_i$ and asks whether the selection should depend on the person; the earlier worktree experiments found that it should not.
+
+Notation and the full sentence model are in `ablation/full_model/breakdown.md`; the paired ΔNLL and its bootstrap interval are defined in `docs/math/05_paired_evaluation.md`.

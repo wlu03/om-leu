@@ -36,3 +36,6 @@ tmp/
 .claude/
 runs/
 experiments/data/
+
+# ablation/: per-run JSON (per-event NLL lists) stay local; results.md + README.md are tracked
+ablation/*/results/*.json

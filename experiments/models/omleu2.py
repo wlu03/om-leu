@@ -54,7 +54,7 @@ from __future__ import annotations
 import dataclasses
 import time
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -99,6 +99,8 @@ class Config:
     pi_boot: int = 100
     pi_l2: float = 1.0                  # ridge on w (per validation event) for the covariate gate
     slot_keep: Tuple[int, ...] = ()     # members see only these sentence slots (others zeroed); () = all K
+    member_kind: str = "pref"           # stage-3 member class (MEMBER_FACTORIES key); "pref" = PrefBranch V1
+    member_kw: Tuple[Tuple[str, object], ...] = ()   # keyword overrides for the member class (ablations/)
 
 
 @dataclass
@@ -340,23 +342,30 @@ def shuffled_view(b: Bundle, seed: int) -> Bundle:
 
 
 # ----------------------------------------------------------------------------- stage 3
-def _pretrain_member(m: PrefBranch, b: Bundle, seed: int):
-    probe = lambda m_, b_, s_: PREF_LAM_PROBE * F.cross_entropy(m.probe_logits(b_, s_), b_.y[s_])
+# member classes: name -> factory(bundle, **kw) -> nn.Module with forward(b, idx) -> log-probs (n, J)
+# and probe_logits(b, idx) -> logits or None.  ablation/ registers plain networks here.
+MEMBER_FACTORIES: Dict[str, Callable] = {"pref": lambda b, **kw: PrefBranch(b, **{**PREF_V1, **kw})}
+
+
+def _pretrain_member(m: nn.Module, b: Bundle, seed: int):
+    has_probe = getattr(m, "has_probe", True)
+    probe = (lambda m_, b_, s_: PREF_LAM_PROBE * F.cross_entropy(m.probe_logits(b_, s_), b_.y[s_])) if has_probe else None
     return fit(m, b, params=list(m.parameters()), seed=seed, extra_loss=probe, **PREF_TRAIN)
 
 
 def semantic_members(b: Bundle, seed: int, members: int, shuffled: bool = False,
-                     view: str = "") -> Tuple[List[PrefBranch], Dict]:
-    key = (b.dataset, seed, members, shuffled, view)
+                     view: str = "", kind: str = "pref", kw: Tuple[Tuple[str, object], ...] = ()) -> Tuple[List[nn.Module], Dict]:
+    key = (b.dataset, seed, members, shuffled, view, kind, kw)
     if key in _MEMBER_CACHE:
         return _MEMBER_CACHE[key]
     torch.manual_seed(seed)
-    mems = [PrefBranch(b, **PREF_V1) for _ in range(members)]
+    mems = [MEMBER_FACTORIES[kind](b, **dict(kw)) for _ in range(members)]
     frs = [_pretrain_member(m, b, seed * 100 + i) for i, m in enumerate(mems)]
     ens = _SemEnsemble(mems)
-    sem_test = {k: evaluate(ens, b, "test")[k] for k in ("top1", "nll", "brier", "ece")}
+    ev = evaluate(ens, b, "test")
+    sem_test = {k: ev[k] for k in ("top1", "nll", "brier", "ece")}
     info = {"member_best_val": [f.best_val_nll for f in frs], "member_best_epoch": [f.best_epoch for f in frs],
-            "sem_only_test": sem_test, "seconds": sum(f.seconds for f in frs),
+            "sem_only_test": sem_test, "sem_only_per_event_nll": ev["per_event_nll"], "seconds": sum(f.seconds for f in frs),
             "n_params": int(sum(p.numel() for m in mems for p in m.parameters()))}
     _MEMBER_CACHE[key] = (mems, info)
     return _MEMBER_CACHE[key]
@@ -560,7 +569,8 @@ def _build(b: Bundle, seed: int, cfg: Config, view_tag: str = ""):
             if cfg.slot_keep:
                 sb = slot_view(sb, cfg.slot_keep)
             mems, minfo = semantic_members(sb, seed, cfg.members, shuffled=cfg.shuffle_sentences,
-                                           view=view + cfg.sentence_control + (f"slots{cfg.slot_keep}" if cfg.slot_keep else ""))
+                                           view=view + cfg.sentence_control + (f"slots{cfg.slot_keep}" if cfg.slot_keep else ""),
+                                           kind=cfg.member_kind, kw=cfg.member_kw)
             model.members = nn.ModuleList(mems)
             model.sem_view = sb if (cfg.shuffle_sentences or cfg.sentence_control or view or cfg.slot_keep) else None
             info["stage3"] = minfo

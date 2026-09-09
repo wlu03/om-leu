@@ -70,12 +70,18 @@ class PrefBranch(nn.Module):
 
     def __init__(self, b: Bundle, *, r: int = 32, M: int = 5, T: int = 1, attn: str = "person",
                  head_hidden: int = 0, w_hidden: int = 32, slot_drop: float = 0.15, person_input: str = "Z",
-                 proj_drop: float = 0.1):
+                 proj_drop: float = 0.1, weights: str = "net", proj: bool = True, probe: bool = True):
+        """``weights``: "net" (person weights over the M heads from z_i) or "uniform" (1/M, ablation);
+        ``proj=False`` drops the low-rank projection (heads act on the LayerNormed d-dim embedding);
+        ``probe=False`` drops the InfoNCE probe (``probe_logits`` returns None, so no auxiliary loss)."""
         super().__init__()
+        if not proj:
+            r = b.d
         self.r, self.M, self.T, self.attn, self.slot_drop = r, M, T, attn, slot_drop
         self.person_input = person_input
+        self.weights_mode, self.has_probe = weights, probe
         pz = b.Z.shape[1] if person_input == "Z" else b.z_d.shape[1]
-        self.proj = nn.Linear(b.d, r, bias=False)
+        self.proj = nn.Linear(b.d, r, bias=False) if proj else nn.Identity()
         self.norm = nn.LayerNorm(r)
         self.proj_drop = nn.Dropout(proj_drop)
         if head_hidden > 0:
@@ -91,9 +97,14 @@ class PrefBranch(nn.Module):
             pass
         else:
             raise ValueError(attn)
-        self.weights = nn.Sequential(nn.Linear(pz, w_hidden), nn.ReLU(), nn.Linear(w_hidden, M))
+        if weights == "net":
+            self.weights = nn.Sequential(nn.Linear(pz, w_hidden), nn.ReLU(), nn.Linear(w_hidden, M))
+        elif weights == "uniform":
+            self.weights = None
+        else:
+            raise ValueError(weights)
         # linear probe on the mean projected sentence (InfoNCE target)
-        self.probe = nn.Linear(r, 1)
+        self.probe = nn.Linear(r, 1) if probe else None
         if T > 1:
             self.type_vec = nn.Parameter(torch.randn(T, r) * 0.5)
             self.type_film = nn.Linear(r, M)
@@ -129,7 +140,7 @@ class PrefBranch(nn.Module):
         H = self.project(b, idx)
         Hp = self.pool(H, z)                                      # (n,J,r)
         A = self.heads(Hp)                                        # (n,J,M)
-        wl = self.weights(z)                                      # (n,M)
+        wl = self.weights(z) if self.weights is not None else torch.zeros(len(z), self.M, device=A.device)  # (n,M)
         if self.T == 1:
             w = torch.softmax(wl, -1)
             return (A * w[:, None, :]).sum(-1)[:, None, :]        # (n,1,J)
@@ -139,7 +150,9 @@ class PrefBranch(nn.Module):
         w_t = torch.softmax(wl[:, None, :] + wb[None], -1)        # (n,T,M)
         return (A_t * w_t[:, :, None, :]).sum(-1)                 # (n,T,J)
 
-    def probe_logits(self, b: Bundle, idx: torch.Tensor) -> torch.Tensor:
+    def probe_logits(self, b: Bundle, idx: torch.Tensor) -> Optional[torch.Tensor]:
+        if self.probe is None:
+            return None
         H = self.project(b, idx)
         return self.probe(H.mean(2)).squeeze(-1)                  # (n,J)
 

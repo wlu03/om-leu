@@ -1,0 +1,11 @@
+**Problem:**  
+Make the attention person-conditioned, $\alpha_{ijk} \propto \exp\big(q(z_i)^{\top} K H_{ijk} / \sqrt{r}\big)$ with $q(z_i) = W_q z_i$, instead of the person-agnostic salience $\alpha_{ijk} \propto \exp(v^{\top} H_{ijk})$. This is the version drawn in many architecture sketches of the method. Why is it not the final model, and what does the ablation test?
+
+**Explanation:**  
+With a person query the pooled sentence $h_{ij} = \sum_k \alpha_{ijk}(z_i) H_{ijk}$ changes from person to person: someone sensitive to cost would attend to the financial sentence, someone else to the comfort sentence. The person then enters the member twice, through the attention and through the head weights $w(z_i)$, and the utility is no longer bilinear in (person, sentence content) but a more general function.
+
+The extra flexibility has a cost that the data cannot pay. The query matrix $W_q \in \mathbb{R}^{r \times P}$ and the key matrix $K \in \mathbb{R}^{r \times r}$ add about $r(P + r)$ parameters that interact multiplicatively with the sentence content, and $P$ is 22 to 60 covariates after one-hot encoding; with a few thousand training events and early stopping on a few hundred validation events, the members either do not learn the interaction or overfit it. In the earlier worktree exploration (`experiments/models/pref.py`, variants V2–V4) person-conditioned attention did not beat salience on any dataset, and the salience version was kept because it is simpler and because the person weights over heads already provide a person-specific reading of the sentences at the level where it is identifiable: five weights per person over five named attributes rather than 32 query dimensions.
+
+The folder therefore tests a specific claim of the design: person heterogeneity belongs in the weighting of attributes, not in the reading of sentences. A negative sentence-only $\Delta$ (person attention better) would contradict it; a zero or positive $\Delta$ supports it and justifies drawing the attention block without an arrow from $z_i$.
+
+Notation and the full sentence model are in `ablation/full_model/breakdown.md`; the paired ΔNLL and its bootstrap interval are defined in `docs/math/05_paired_evaluation.md`.
