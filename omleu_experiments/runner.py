@@ -26,7 +26,7 @@ import torch
 from experiments.harness.data import Bundle, load_bundle
 
 from . import artifacts as art
-from .calibrate import apply_calibration, fit_mixture
+from .calibrate import apply_calibration, apply_conditional_gate, fit_conditional_gate, fit_mixture
 from .contracts import Prediction, stable_hash
 from .metrics import all_metrics, event_nll
 from .numeric import fit_numeric
@@ -44,12 +44,29 @@ class Variant:
     sentence_source: str = "llm"
     source_kw: Dict = field(default_factory=dict)
     use_boost: bool = True
+    calibrator: str = "global"          # "global" scalar pi, or "gate" (E7 conditional gate)
+    gate_l2: float = 1.0
     group: str = "core"
     notes: str = ""
 
     @property
     def config_hash(self) -> str:
         return stable_hash(asdict(self))
+
+
+def gate_context(b: Bundle, rows: np.ndarray) -> np.ndarray:
+    """Small, predeclared context for the conditional gate.
+
+    Admissible history length, an evidence/missingness indicator (how many of the recorded
+    attributes of the chosen-set alternatives are absent), and the size of the choice set.
+    No label, no channel correctness, no test-set quantity.
+    """
+    hist = b.Xhist[rows].sum(dim=(1, 2)).numpy()
+    missing = (b.Xnum[rows] == 0).float().mean(dim=(1, 2)).numpy()
+    size = np.full(len(rows), float(b.J))
+    C = np.stack([np.log1p(hist), missing, size], 1)
+    mu, sd = C.mean(0, keepdims=True), C.std(0, keepdims=True) + 1e-6
+    return (C - mu) / sd
 
 
 def cluster_ids(b: Bundle, persons: Sequence[str]) -> np.ndarray:
@@ -150,6 +167,11 @@ def run_variant(dataset: str, master_seed: int, protocol: str, variant: Variant,
     Q_oof = np.concatenate(oof_sem, 0) if oof_sem else None
     cal = fit_mixture(U_oof, Q_oof, y[rows_oof])
     cal_numeric_only = fit_mixture(U_oof, None, y[rows_oof], fit_pi=False)
+    gate_cal = None
+    if variant.calibrator == "gate":
+        if Q_oof is None:
+            raise RuntimeError("the conditional gate needs a semantic channel")
+        gate_cal = fit_conditional_gate(U_oof, Q_oof, y[rows_oof], gate_context(b, rows_oof), l2=variant.gate_l2)
 
     # refit on the whole development partition, then predict the locked test partition once
     f_rows, v_rows = inner_split(dev_rows, clusters, master_seed * 31 + 999)
@@ -166,7 +188,10 @@ def run_variant(dataset: str, master_seed: int, protocol: str, variant: Variant,
         bv_sem = restandardise_covariates(fold_view(bs, f_rows, v_rows, test_rows))
         reader.fit(bv_sem, master_seed * 17 + 999)
         Q_test = reader.logprobs(bv_sem, test_rows)
-    lp_final = apply_calibration(U_test, Q_test, cal)
+    if gate_cal is not None:
+        lp_final = apply_conditional_gate(U_test, Q_test, gate_context(b, test_rows), gate_cal)
+    else:
+        lp_final = apply_calibration(U_test, Q_test, cal)
     lp_numeric = apply_calibration(U_test, None, cal_numeric_only)
     yt = y[test_rows]
     m_final = all_metrics(lp_final, yt)
@@ -188,13 +213,20 @@ def run_variant(dataset: str, master_seed: int, protocol: str, variant: Variant,
         "partition": {"hash": part.manifest_hash, "notes": part.notes, "n_dev": int(len(dev_rows)),
                       "n_test": int(len(test_rows)), "n_folds": len(part.dev_folds),
                       "n_test_clusters": int(len(set(clusters[test_rows].tolist())))},
-        "calibration": cal, "calibration_numeric_only": cal_numeric_only,
+        "calibration": cal, "calibration_numeric_only": cal_numeric_only, "calibration_gate": gate_cal,
         "metrics_final": m_final, "metrics_numeric_only": m_numeric, "metrics_semantic_only": m_sem,
         "smoke": smoke, "members": members, "seconds": time.time() - t0,
         "environment": art.environment_fingerprint(Path(__file__).resolve().parents[1]),
     }
     art.write_atomic(out_dir / "result.json", payload)
     art.write_atomic(out_dir / "predictions.json", preds)
+    art.write_atomic(out_dir / "oof_development_predictions.json", {
+        "note": "held-out development predictions used to fit pi and the temperature; these are "
+                "calibration inputs and are never reported as an evaluation of the fitted mixture",
+        "rows": [int(r) for r in rows_oof], "y": [int(v) for v in y[rows_oof]],
+        "cluster": [str(clusters[r]) for r in rows_oof],
+        "numeric_logits": U_oof.tolist(),
+        "semantic_logprobs": None if Q_oof is None else Q_oof.tolist()})
     art.record_status(artifact_root, {"status": "completed", "dataset": dataset, "protocol": protocol,
                                       "variant": variant.name, "master_seed": master_seed,
                                       "artifact": str(out_dir), "nll": m_final["nll"], "smoke": smoke})
