@@ -160,3 +160,24 @@ build, not a general restriction.  Local generation is possible without paid req
 `RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic` on Modal; no generation budget is configured, so new
 paid generation is `blocked_generation_budget` and any local generation is recorded as a different
 generator revision.
+
+## 9. Do the reported numbers match the saved predictions?
+
+Checked by recomputing each stored metric from the per-event predictions in the same artifact:
+
+```bash
+venv/bin/python - <<'PY'
+import json, numpy as np
+d = json.load(open("experiments/results/combo_full/optima_seed7.json"))
+print(d["nll"], np.mean(d["per_event_nll"]), d["top1"], np.mean(d["per_event_top1"]))
+PY
+```
+
+The stored negative log-likelihood and Top-1 agree with the mean of the saved per-event values to
+about 6e-9, which is float32 rounding.  Six headline numbers quoted in the project's write-ups
+(`pi_oof`, `combo_full`, `abl_cold_start_struct`, `pi_cold_oof` across the three datasets) were
+checked against the artifacts for seeds 7, 11 and 13 and match to three decimal places, with the
+protocol and calibration variant named in each case.  Two presentation rules follow and are applied
+in this programme's report: a number is always printed with the protocol and the calibration variant
+that produced it, and prose never carries a rounded value that is not also in a table generated from
+the artifacts.
