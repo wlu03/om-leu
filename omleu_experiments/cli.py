@@ -70,8 +70,9 @@ def cmd_run(args):
                     try:
                         r = run_variant(ds, seed, proto, v, root, folds=args.folds, members=args.members,
                                         smoke=args.smoke, numeric_cache=cache)
+                        tag = " (cached)" if r.get("reused_existing_artifact") else ""
                         print(f"[{ds} s{seed} {proto}] {name:34s} nll={r['metrics_final']['nll']:.4f} "
-                              f"numeric={r['metrics_numeric_only']['nll']:.4f} pi={r['calibration']['pi']:.3f}", flush=True)
+                              f"numeric={r['metrics_numeric_only']['nll']:.4f} pi={r['calibration']['pi']:.3f}{tag}", flush=True)
                     except Exception as e:
                         status = "blocked_data" if isinstance(e, RuntimeError) and "unsupported" in str(e) else "failed"
                         art.record_status(root, {"status": status, "dataset": ds, "protocol": proto, "variant": name,

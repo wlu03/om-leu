@@ -89,7 +89,9 @@ def build_source(b: Bundle, kind: str, *, seed: int = 0, cache_dir: Optional[Pat
     path = None if cache_dir is None else Path(cache_dir) / f"sent_{b.dataset}_s{b.seed}_{kind}{tag}_{key[:12]}.npy"
     if path is not None and path.exists():
         return torch.from_numpy(np.load(path)).float()
-    if kind == "llm":
+    if kind in ("llm", "none"):
+        # "none" belongs to a channel that reads no text at all (the numeric auxiliary);
+        # the tensor is passed through unchanged and ignored by that reader
         return b.E.float()
     if kind in ("template", "identity", "custom"):
         fn = builder or (template_sentences if kind == "template" else identity_sentences)

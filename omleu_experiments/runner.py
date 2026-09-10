@@ -131,7 +131,7 @@ def make_partition(b: Bundle, protocol: str, master_seed: int, persons, order_va
 
 def run_variant(dataset: str, master_seed: int, protocol: str, variant: Variant, artifact_root: Path,
                 *, folds: int = 5, members: int = 5, smoke: bool = False, owner: str = "coordinator",
-                numeric_cache: Optional[Dict] = None) -> Dict:
+                numeric_cache: Optional[Dict] = None, skip_existing: bool = True) -> Dict:
     t0 = time.time()
     b = load_bundle(dataset, master_seed if master_seed in (7, 11, 13) else 7)
     persons, order_dates, _ = person_strings(b)
@@ -142,6 +142,11 @@ def run_variant(dataset: str, master_seed: int, protocol: str, variant: Variant,
     cfg_hash = stable_hash({"v": variant.config_hash, "p": part.manifest_hash, "f": folds, "m": members,
                             "s": master_seed, "smoke": smoke})
     out_dir = art.artifact_dir(artifact_root, dataset, protocol, variant.name, master_seed, cfg_hash)
+    if skip_existing and (out_dir / "result.json").exists():
+        import json as _json
+        done = _json.loads((out_dir / "result.json").read_text())
+        done["reused_existing_artifact"] = True
+        return done
     if not art.claim(out_dir, owner):
         raise RuntimeError(f"artifact directory owned by another worker: {out_dir}")
 
