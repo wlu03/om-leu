@@ -89,7 +89,9 @@ def cmd_evaluate(args):
 
 def cmd_report(args):
     from .evaluate import write_report
+    from .report import write as write_contrasts
     print(write_report(_artifact_root(args), Path(args.out) if args.out else None))
+    print(write_contrasts(_artifact_root(args)))
 
 
 def main(argv=None):
