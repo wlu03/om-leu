@@ -34,8 +34,13 @@ def restandardise_covariates(b: Bundle) -> Bundle:
     """
     tr = b.idx("train")
     mu = b.Z[tr].mean(0, keepdim=True)
-    sd = b.Z[tr].std(0, keepdim=True).clamp_min(1e-6)
-    return dataclasses.replace(b, Z=(b.Z - mu) / sd)
+    sd = b.Z[tr].std(0, keepdim=True)
+    keep = (sd > 1e-6).float()
+    # A covariate that is constant across this partition's training rows carries no training
+    # information; it is set to zero rather than divided by a near-zero deviation, which would
+    # turn a rare category present only in a held-out respondent into an enormous value.
+    Z = ((b.Z - mu) / torch.where(sd > 1e-6, sd, torch.ones_like(sd))) * keep
+    return dataclasses.replace(b, Z=Z)
 
 
 def replace_embeddings(b: Bundle, E: torch.Tensor) -> Bundle:
