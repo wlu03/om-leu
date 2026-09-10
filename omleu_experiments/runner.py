@@ -44,6 +44,7 @@ class Variant:
     sentence_source: str = "llm"
     source_kw: Dict = field(default_factory=dict)
     use_boost: bool = True
+    train_fraction: float = 1.0         # E6 learning curves: nested share of training clusters
     calibrator: str = "global"          # "global" scalar pi, or "gate" (E7 conditional gate)
     gate_l2: float = 1.0
     group: str = "core"
@@ -52,6 +53,20 @@ class Variant:
     @property
     def config_hash(self) -> str:
         return stable_hash(asdict(self))
+
+
+def subsample_clusters(rows: np.ndarray, clusters: np.ndarray, fraction: float, seed: int) -> np.ndarray:
+    """Nested subset of the training clusters: the 10% set is inside the 25% set, and so on.
+
+    Whole respondents are kept or dropped; events are never subsampled inside a respondent,
+    and the development and test partitions are untouched.
+    """
+    if fraction >= 1.0:
+        return rows
+    uniq = np.array(sorted(set(clusters[rows].tolist())))
+    order = np.random.default_rng(seed).permutation(len(uniq))
+    keep = set(uniq[order[:max(1, int(round(fraction * len(uniq))))]].tolist())
+    return rows[np.array([c in keep for c in clusters[rows]])]
 
 
 def gate_context(b: Bundle, rows: np.ndarray) -> np.ndarray:
@@ -148,6 +163,7 @@ def run_variant(dataset: str, master_seed: int, protocol: str, variant: Variant,
             fit_rows = fit_rows[order_values[fit_rows] < order_values[fold].min()]
             if len(fit_rows) < 50:
                 continue
+        fit_rows = subsample_clusters(fit_rows, clusters, variant.train_fraction, master_seed * 101)
         f_rows, v_rows = inner_split(fit_rows, clusters, master_seed * 31 + k)
         nk = stable_hash({"d": dataset, "s": master_seed, "p": part.manifest_hash, "k": k,
                           "pe": person_effects, "bo": variant.use_boost})
@@ -174,7 +190,8 @@ def run_variant(dataset: str, master_seed: int, protocol: str, variant: Variant,
         gate_cal = fit_conditional_gate(U_oof, Q_oof, y[rows_oof], gate_context(b, rows_oof), l2=variant.gate_l2)
 
     # refit on the whole development partition, then predict the locked test partition once
-    f_rows, v_rows = inner_split(dev_rows, clusters, master_seed * 31 + 999)
+    dev_fit_rows = subsample_clusters(dev_rows, clusters, variant.train_fraction, master_seed * 101)
+    f_rows, v_rows = inner_split(dev_fit_rows, clusters, master_seed * 31 + 999)
     nk = stable_hash({"d": dataset, "s": master_seed, "p": part.manifest_hash, "k": "final",
                       "pe": person_effects, "bo": variant.use_boost})
     if nk not in numeric_cache:
@@ -210,6 +227,11 @@ def run_variant(dataset: str, master_seed: int, protocol: str, variant: Variant,
     payload = {
         "status": "completed", "dataset": dataset, "protocol": protocol, "variant": variant.name,
         "variant_config": asdict(variant), "master_seed": master_seed, "config_hash": cfg_hash,
+        "label_budget": {"train_fraction": variant.train_fraction,
+                         "training_events_used": int(len(dev_fit_rows)),
+                         "training_clusters_used": int(len(set(clusters[dev_fit_rows].tolist()))),
+                         "calibration_events": int(len(rows_oof)),
+                         "note": "calibration and early-stopping labels are counted separately from fitting labels"},
         "partition": {"hash": part.manifest_hash, "notes": part.notes, "n_dev": int(len(dev_rows)),
                       "n_test": int(len(test_rows)), "n_folds": len(part.dev_folds),
                       "n_test_clusters": int(len(set(clusters[test_rows].tolist())))},
