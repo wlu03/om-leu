@@ -91,3 +91,60 @@ def apply_calibration(numeric_logits: np.ndarray, semantic_logprobs: Optional[np
     log_a = torch.tensor(float(np.log(cal["a"])), dtype=torch.float64)
     with torch.no_grad():
         return mixture_logprob(U, Q, gamma, log_a, A).numpy()
+
+
+# --------------------------------------------------------------------------------------
+# Conditional mixture gate (used by E7).  The gate is a regularised logistic function of a
+# small, predeclared context vector, shrunk towards the global mixture weight.  It never
+# sees a label, the correctness of a channel, or any test-set quantity.
+# --------------------------------------------------------------------------------------
+
+def fit_conditional_gate(numeric_logits: np.ndarray, semantic_logprobs: np.ndarray, y: np.ndarray,
+                         context: np.ndarray, *, l2: float = 1.0, avail: Optional[np.ndarray] = None,
+                         fit_temp: bool = True) -> Dict[str, float]:
+    """pi_i = sigmoid(gamma + beta^T context_i), with ``l2`` shrinking beta towards zero,
+    i.e. towards the global gate.  Fitted on held-out development predictions only."""
+    U = torch.as_tensor(numeric_logits, dtype=torch.float64)
+    Q = torch.as_tensor(semantic_logprobs, dtype=torch.float64)
+    C = torch.as_tensor(context, dtype=torch.float64)
+    Y = torch.as_tensor(y, dtype=torch.long)
+    A = None if avail is None else torch.as_tensor(avail, dtype=torch.bool)
+    gamma = torch.tensor(-2.0, dtype=torch.float64, requires_grad=True)
+    beta = torch.zeros(C.shape[1], dtype=torch.float64, requires_grad=True)
+    log_a = torch.tensor(0.0, dtype=torch.float64, requires_grad=fit_temp)
+    params = [gamma, beta] + ([log_a] if fit_temp else [])
+    opt = torch.optim.LBFGS(params, lr=1.0, max_iter=300, line_search_fn="strong_wolfe")
+
+    def loss_fn():
+        pi = torch.sigmoid(gamma + C @ beta)[:, None]
+        u = U * torch.exp(log_a)
+        if A is not None:
+            u = u.masked_fill(~A, -1e30)
+        lp = torch.logaddexp(torch.log1p(-pi + EPS) + torch.log_softmax(u, -1), torch.log(pi + EPS) + Q)
+        return -lp[torch.arange(len(Y)), Y].mean() + l2 * (beta ** 2).sum() / len(Y)
+
+    def closure():
+        opt.zero_grad(); l = loss_fn(); l.backward(); return l
+    opt.step(closure)
+    with torch.no_grad():
+        pi = torch.sigmoid(gamma + C @ beta)
+        return {"gamma": float(gamma), "beta": [float(x) for x in beta], "a": float(torch.exp(log_a)),
+                "temperature": float(1.0 / torch.exp(log_a)), "l2": l2, "dev_nll": float(loss_fn()),
+                "pi_mean": float(pi.mean()), "pi_p10": float(pi.quantile(0.1)), "pi_p90": float(pi.quantile(0.9)),
+                "n_dev_events": int(len(y))}
+
+
+def apply_conditional_gate(numeric_logits: np.ndarray, semantic_logprobs: np.ndarray, context: np.ndarray,
+                           cal: Dict[str, float], avail: Optional[np.ndarray] = None) -> np.ndarray:
+    U = torch.as_tensor(numeric_logits, dtype=torch.float64)
+    Q = torch.as_tensor(semantic_logprobs, dtype=torch.float64)
+    C = torch.as_tensor(context, dtype=torch.float64)
+    A = None if avail is None else torch.as_tensor(avail, dtype=torch.bool)
+    with torch.no_grad():
+        pi = torch.sigmoid(torch.tensor(cal["gamma"], dtype=torch.float64) +
+                           C @ torch.as_tensor(cal["beta"], dtype=torch.float64))[:, None]
+        u = U * cal["a"]
+        if A is not None:
+            u = u.masked_fill(~A, -1e30)
+        return torch.logaddexp(torch.log1p(-pi + EPS) + torch.log_softmax(u, -1),
+                               torch.log(pi + EPS) + Q).numpy()
