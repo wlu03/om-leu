@@ -16,20 +16,20 @@ for frac in (0.1, 0.25, 0.5, 1.0):
             continue
         _LC.append(Variant(name, reader=base, reader_kw=kw, sentence_source=src, train_fraction=frac,
                            group="transfer", notes=f"learning curve at {int(frac*100)}% of training respondents"))
+# The target of a transfer is the dataset the run is executed on, so a variant names only its
+# source.  ``run_variant`` refuses a variant whose source equals its target, which keeps the six
+# ordered pairs honest: three sources times the two other datasets as targets.
 _TR = []
 DS = ("swissmetro", "optima", "lpmc")
 for s in DS:
-    for t in DS:
-        if s == t:
-            continue
-        _TR.append(Variant(f"transfer_{s}_to_{t}", reader="transfer",
-                           reader_kw={"source": s, "axis_kw": {"sensitivity": "global"}, "freeze": True},
-                           sentence_source="llm", group="transfer",
-                           notes=f"axis scorer fitted on {s}, frozen; valuation and calibration refitted on {t}"))
-        _TR.append(Variant(f"transfer_{s}_to_{t}_finetune", reader="transfer",
-                           reader_kw={"source": s, "axis_kw": {"sensitivity": "global"}, "freeze": False},
-                           sentence_source="llm", group="transfer",
-                           notes="full fine-tuning comparator"))
+    _TR.append(Variant(f"transfer_from_{s}", reader="transfer",
+                       reader_kw={"source": s, "axis_kw": {"sensitivity": "global"}, "freeze": True},
+                       sentence_source="llm", group="transfer",
+                       notes=f"axis scorer fitted on {s} and frozen; valuation and calibration refitted on the target"))
+    _TR.append(Variant(f"transfer_from_{s}_finetune", reader="transfer",
+                       reader_kw={"source": s, "axis_kw": {"sensitivity": "global"}, "freeze": False},
+                       sentence_source="llm", group="transfer",
+                       notes=f"same source ({s}), full fine-tuning comparator"))
 for v in _LC + _TR:
     register(v)
 SUITES["e6_learning_curve"] = [v.name for v in _LC]

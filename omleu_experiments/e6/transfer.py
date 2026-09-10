@@ -76,6 +76,8 @@ class TransferReader(SemanticReader):
         return AxisNet(b, **self.axis_kw)
 
     def fit(self, b: Bundle, seed: int) -> None:
+        if self.source == b.dataset:
+            raise RuntimeError(f"transfer variant is unsupported here: source and target are both {b.dataset}")
         if self._source_state is None:
             self._source_state = self._fit_source(seed)
         torch.manual_seed(seed)

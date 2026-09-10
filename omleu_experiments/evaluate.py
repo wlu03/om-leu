@@ -16,6 +16,8 @@ BASELINE = "numeric_only"
 def _load(root: Path) -> List[Dict]:
     out = []
     for f in sorted(Path(root).rglob("result.json")):
+        if "superseded" in str(f):
+            continue          # archived runs from a fixed defect are never read into a table
         r = json.loads(f.read_text())
         p = f.parent / "predictions.json"
         if p.exists():

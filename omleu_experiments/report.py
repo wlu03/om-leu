@@ -139,7 +139,7 @@ def write(root: Path, out: Optional[Path] = None, protocol: str = "person_disjoi
             seen.add(k)
             md.append(f"| {e['status']} | {e.get('dataset','')} | {e.get('protocol','')} | {e.get('variant','')} "
                       f"| {e.get('master_seed','')} | {str(e.get('reason',''))[:150]} |")
-    if len(md[-1].startswith("|---")) and not seen:
-        md.append("| (no failures recorded) | | | | | |")
+    if not seen:
+        md.append("| (no failure or block recorded) | | | | | |")
     Path(out).write_text("\n".join(md))
     return str(out)
