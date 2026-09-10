@@ -12,6 +12,6 @@ $$
 
 The mixture column for this folder (the all-input MLP mixed with the structural channel) is reported for completeness but is not the intended comparison, since the network already contains the structural inputs.
 
-One caveat belongs in the reading. The plain MLP has no monotonicity constraint on time and cost and no person random effects, so under the chronological protocol it cannot memorise a person's earlier choices the way stage 1's $u_{p(i)j}$ can; that is a feature of the design being tested, not an unfairness. Under the person-level protocol the person effects are switched off for every row and the comparison is clean.
+One qualification applies. The plain MLP has no monotonicity constraint on time and cost and no person random effects, so under the chronological protocol it cannot memorise a person's earlier choices the way stage 1's $u_{p(i)j}$ can; that is part of the design being tested, not an unfair comparison. Under the person-level protocol the person effects are switched off for every row and the comparison is clean.
 
 Notation and the full sentence model are in `ablation/full_model/breakdown.md`; the paired ΔNLL and its bootstrap interval are defined in `docs/math/05_paired_evaluation.md`.

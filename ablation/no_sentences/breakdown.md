@@ -1,5 +1,5 @@
 **Problem:**  
-The model is run with no sentence channel at all: stages 1–2 with the temperature $a$ and $M = 0$ members, so $p_i(j) = \operatorname{softmax}_j(a\,U_{ij})$. What does this row anchor, and why is its mixture NLL the right zero point for "how much comes from the LLM"?
+The model is run with no sentence channel at all: stages 1–2 with the temperature $a$ and $M = 0$ members, so $p_i(j) = \operatorname{softmax}_j(a\,U_{ij})$. What does this row fix as the reference, and why is its mixture NLL the right zero point for "how much comes from the LLM"?
 
 **Explanation:**  
 With no members the mixture collapses to the structural channel alone,

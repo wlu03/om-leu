@@ -26,8 +26,8 @@ same mixture NLL as the designed sentence model on every dataset and protocol; t
 | person: flat sentence MLP / designed model | 0.608 / 0.613 (−0.005*) | 0.405 / 0.411 | 0.464 / 0.474 (−0.009*) |
 
 So the improvement the paper attributes to the sentence channel comes from the **LLM sentences
-themselves**, not from the projection / attention / heads / person-weight architecture: any
-reasonable learner on the same embeddings delivers it once the structural channel is in place.
+themselves**, not from the projection / attention / heads / person-weight architecture: an
+ordinary network on the same embeddings obtains it once the structural channel is present.
 
 ## 3. Where the designed sentence model does matter: evaluated alone, and only through z_i
 
@@ -41,7 +41,7 @@ Sentence-only NLL (no structural channel):
 
 (chronological / person split.) The designed model beats the sentence-only MLP by 0.09* on Optima
 and 0.025* on LPMC-chronological, but a plain MLP that is also given z_i matches it on Optima and
-beats it on LPMC-chronological (−0.030*). The knock-outs say the same thing from the inside:
+beats it on LPMC-chronological (−0.030*). The knock-outs give the same result:
 removing the person weights (`no_person_weights`) or collapsing to one head (`single_head`) costs
 0.09* on Optima, 0.02–0.03* on LPMC and 0.015* on Swissmetro sentence-only, and these are the only
 two design knock-outs with a consistent loss. The salience attention is neutral or slightly

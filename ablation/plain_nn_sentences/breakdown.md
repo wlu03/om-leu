@@ -8,7 +8,7 @@ $$
 \phi_{ij} = \frac{1}{K}\sum_{k=1}^{K} e_{ijk} \in \mathbb{R}^{768}, \qquad u_{ij} = \mathrm{MLP}(\phi_{ij}) = W_3\,\sigma\!\big(W_2\,\sigma(W_1 \phi_{ij})\big), \qquad p(j \mid E_i) = \operatorname{softmax}_j(u_{ij}),
 $$
 
-with hidden widths $128$ and $64$, ReLU, dropout $0.2$, trained by the same cross-entropy, optimiser, early stopping and weight decay as the designed members, and averaged over the same five seeds. It sees exactly the same sentences and embeddings as OM-LEU 2. It has no projection-with-probe, no attention over sentences, no attribute heads, no person input and no structural utility: it is what "feed the LLM output to a neural network" means literally.
+with hidden widths $128$ and $64$, ReLU, dropout $0.2$, trained by the same cross-entropy, optimiser, early stopping and weight decay as the designed members, and averaged over the same five seeds. It sees exactly the same sentences and embeddings as OM-LEU 2. It has no projection-with-probe, no attention over sentences, no attribute heads, no person input and no structural utility: it is the direct meaning of "feed the LLM output to a neural network".
 
 Relative to the designed member, the baseline replaces the whole map $E_{ij} \mapsto \tilde V_{ij}$; the mean over $k$ discards which axis a sentence belongs to, and the absence of $z_i$ means that two people with the same sentences get the same probabilities. Everything the designed model adds — the low-rank contrastive space, the salience weights, the head decomposition, the person weights — is removed at once, so the sentence-only gap
 
@@ -16,9 +16,9 @@ $$
 \Delta_{\text{design}} = \mathrm{NLL}_{\text{sent}}(\texttt{plain\_nn\_sentences}) - \mathrm{NLL}_{\text{sent}}(\texttt{full\_model})
 $$
 
-is the value of the designed model *on the same information*. Because the sentences are identical, none of this gap can come from the LLM.
+is the value of the designed model *on the same information*. Because the sentences are identical, no part of this gap can come from the LLM.
 
-The second score closes the decomposition. Mixing the plain MLP with the structural channel through its own fitted $\pi$ gives $\mathrm{NLL}_{\text{mix}}(\texttt{plain\_nn\_sentences})$, and
+The second score completes the decomposition. Mixing the plain MLP with the structural channel through its own fitted $\pi$ gives $\mathrm{NLL}_{\text{mix}}(\texttt{plain\_nn\_sentences})$, and
 
 $$
 \underbrace{\mathrm{NLL}(\texttt{no\_sentences}) - \mathrm{NLL}_{\text{mix}}(\texttt{plain\_nn\_sentences})}_{\text{what the LLM sentences add with no design}}
