@@ -34,13 +34,13 @@ Maths: `breakdown.md`
 
 | sentence channel alone | swissmetro: NLL | Δ vs ref | optima: NLL | Δ vs ref | lpmc: NLL | Δ vs ref |
 |---|---|---|---|---|---|---|
-| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | — | — | 0.5293 | +0.0000 [+0.0000, +0.0000] | 0.5262 | +0.0000 [+0.0000, +0.0000] |
+| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | 0.6986 | +0.0000 [+0.0000, +0.0000] | 0.5037 | +0.0000 [+0.0000, +0.0000] | 0.5498 | +0.0000 [+0.0000, +0.0000] |
 | `no_sentences` no sentences: structural utility + boosted residual + temperature (no LLM input) | — | — | — | — | — | — |
 
 | mixed with the structural model | swissmetro: NLL | Δ vs ref | π | optima: NLL | Δ vs ref | π | lpmc: NLL | Δ vs ref | π |
 |---|---|---|---|---|---|---|---|---|---|
-| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | — | — | — | 0.4121 | +0.0000 [+0.0000, +0.0000] | 0.21 | 0.4459 | +0.0000 [+0.0000, +0.0000] | 0.32 |
-| `no_sentences` no sentences: structural utility + boosted residual + temperature (no LLM input) | — | — | — | 0.3688 | — | 0.00 | 0.4769 | +0.0310* [+0.0112, +0.0529] | 0.00 |
+| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | 0.6087 | +0.0000 [+0.0000, +0.0000] | 0.18 | 0.4004 | +0.0000 [+0.0000, +0.0000] | 0.24 | 0.4708 | +0.0000 [+0.0000, +0.0000] | 0.29 |
+| `no_sentences` no sentences: structural utility + boosted residual + temperature (no LLM input) | 0.6166 | +0.0079* [+0.0041, +0.0120] | 0.00 | 0.4017 | +0.0012 [-0.0057, +0.0085] | 0.00 | 0.4993 | +0.0285* [+0.0171, +0.0402] | 0.00 |
 
 
 ## Per seed
@@ -56,8 +56,15 @@ Maths: `breakdown.md`
 | chrono | val | lpmc | 7 | 0.5400 | 0.002 | 0.95 | nan | 81.3% |
 | chrono | val | lpmc | 11 | 0.5699 | 0.002 | 0.88 | nan | 78.8% |
 | chrono | val | lpmc | 13 | 0.5201 | 0.002 | 1.01 | nan | 81.0% |
+| person | oof | swissmetro | 7 | 0.6703 | 0.002 | 1.00 | nan | 70.3% |
+| person | oof | swissmetro | 11 | 0.5547 | 0.002 | 1.01 | nan | 75.9% |
+| person | oof | swissmetro | 13 | 0.6248 | 0.002 | 1.05 | nan | 72.0% |
 | person | oof | optima | 7 | 0.3688 | 0.002 | 0.95 | nan | 85.3% |
+| person | oof | optima | 11 | 0.4619 | 0.002 | 0.96 | nan | 80.1% |
+| person | oof | optima | 13 | 0.3745 | 0.002 | 1.02 | nan | 84.6% |
 | person | oof | lpmc | 7 | 0.4769 | 0.002 | 1.02 | nan | 82.2% |
+| person | oof | lpmc | 11 | 0.6121 | 0.002 | 0.95 | nan | 77.0% |
+| person | oof | lpmc | 13 | 0.4089 | 0.002 | 1.00 | nan | 85.0% |
 | person | val | swissmetro | 7 | 0.6703 | 0.002 | 1.00 | nan | 70.3% |
 | person | val | swissmetro | 11 | 0.5547 | 0.002 | 1.01 | nan | 75.9% |
 | person | val | swissmetro | 13 | 0.6248 | 0.002 | 1.05 | nan | 72.0% |

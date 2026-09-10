@@ -30,11 +30,11 @@ Maths: `breakdown.md`
 
 | sentence channel alone | swissmetro: NLL | Δ vs ref | optima: NLL | Δ vs ref | lpmc: NLL | Δ vs ref |
 |---|---|---|---|---|---|---|
-| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | — | — | 0.5293 | +0.0000 [+0.0000, +0.0000] | 0.5262 | +0.0000 [+0.0000, +0.0000] |
+| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | 0.6986 | +0.0000 [+0.0000, +0.0000] | 0.5037 | +0.0000 [+0.0000, +0.0000] | 0.5498 | +0.0000 [+0.0000, +0.0000] |
 
 | mixed with the structural model | swissmetro: NLL | Δ vs ref | π | optima: NLL | Δ vs ref | π | lpmc: NLL | Δ vs ref | π |
 |---|---|---|---|---|---|---|---|---|---|
-| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | — | — | — | 0.4121 | +0.0000 [+0.0000, +0.0000] | 0.21 | 0.4459 | +0.0000 [+0.0000, +0.0000] | 0.32 |
+| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | 0.6087 | +0.0000 [+0.0000, +0.0000] | 0.18 | 0.4004 | +0.0000 [+0.0000, +0.0000] | 0.24 | 0.4708 | +0.0000 [+0.0000, +0.0000] | 0.29 |
 
 
 ## Per seed
@@ -50,9 +50,15 @@ Maths: `breakdown.md`
 | chrono | val | lpmc | 7 | 0.5397 | 0.002 | 0.95 | 0.5996 | 81.3% |
 | chrono | val | lpmc | 11 | 0.5638 | 0.082 | 0.91 | 0.6366 | 79.0% |
 | chrono | val | lpmc | 13 | 0.5201 | 0.002 | 1.01 | 0.6252 | 81.0% |
+| person | oof | swissmetro | 7 | 0.6585 | 0.180 | 1.16 | 0.7306 | 70.9% |
+| person | oof | swissmetro | 11 | 0.5498 | 0.189 | 1.18 | 0.6416 | 76.1% |
+| person | oof | swissmetro | 13 | 0.6176 | 0.157 | 1.15 | 0.7236 | 71.9% |
 | person | oof | optima | 7 | 0.3573 | 0.188 | 1.18 | 0.4821 | 85.0% |
 | person | oof | optima | 11 | 0.4670 | 0.238 | 1.13 | 0.5764 | 79.1% |
+| person | oof | optima | 13 | 0.3771 | 0.292 | 1.21 | 0.4526 | 84.3% |
 | person | oof | lpmc | 7 | 0.4459 | 0.316 | 1.22 | 0.5262 | 84.1% |
+| person | oof | lpmc | 11 | 0.5726 | 0.319 | 1.23 | 0.5976 | 78.1% |
+| person | oof | lpmc | 13 | 0.3939 | 0.238 | 1.21 | 0.5256 | 85.0% |
 | person | val | swissmetro | 7 | 0.6699 | 0.002 | 1.01 | 0.7306 | 70.3% |
 | person | val | swissmetro | 11 | 0.5500 | 0.140 | 1.14 | 0.6416 | 76.5% |
 | person | val | swissmetro | 13 | 0.6183 | 0.206 | 1.24 | 0.7236 | 72.0% |

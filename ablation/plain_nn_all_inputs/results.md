@@ -34,13 +34,13 @@ Maths: `breakdown.md`
 
 | sentence channel alone | swissmetro: NLL | Δ vs ref | optima: NLL | Δ vs ref | lpmc: NLL | Δ vs ref |
 |---|---|---|---|---|---|---|
-| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | — | — | 0.5293 | +0.0000 [+0.0000, +0.0000] | 0.5262 | +0.0000 [+0.0000, +0.0000] |
-| `plain_nn_all_inputs` plain MLP on [mean sentence embedding, z_i, x_ij, alt id, h_ij] (all inputs, no structure) | — | — | 0.4321 | — | 0.4284 | -0.0978* [-0.1467, -0.0540] |
+| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | 0.6986 | +0.0000 [+0.0000, +0.0000] | 0.5037 | +0.0000 [+0.0000, +0.0000] | 0.5498 | +0.0000 [+0.0000, +0.0000] |
+| `plain_nn_all_inputs` plain MLP on [mean sentence embedding, z_i, x_ij, alt id, h_ij] (all inputs, no structure) | 0.6256 | -0.0730* [-0.0884, -0.0564] | 0.4598 | -0.0440* [-0.0669, -0.0208] | 0.4626 | -0.0873* [-0.1157, -0.0589] |
 
 | mixed with the structural model | swissmetro: NLL | Δ vs ref | π | optima: NLL | Δ vs ref | π | lpmc: NLL | Δ vs ref | π |
 |---|---|---|---|---|---|---|---|---|---|
-| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | — | — | — | 0.4121 | +0.0000 [+0.0000, +0.0000] | 0.21 | 0.4459 | +0.0000 [+0.0000, +0.0000] | 0.32 |
-| `plain_nn_all_inputs` plain MLP on [mean sentence embedding, z_i, x_ij, alt id, h_ij] (all inputs, no structure) | — | — | — | 0.3590 | — | 0.32 | 0.4345 | -0.0114 [-0.0289, +0.0059] | 0.62 |
+| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | 0.6087 | +0.0000 [+0.0000, +0.0000] | 0.18 | 0.4004 | +0.0000 [+0.0000, +0.0000] | 0.24 | 0.4708 | +0.0000 [+0.0000, +0.0000] | 0.29 |
+| `plain_nn_all_inputs` plain MLP on [mean sentence embedding, z_i, x_ij, alt id, h_ij] (all inputs, no structure) | 0.6103 | +0.0016 [-0.0028, +0.0063] | 0.36 | 0.3987 | -0.0017 [-0.0084, +0.0054] | 0.11 | 0.4655 | -0.0053 [-0.0160, +0.0054] | 0.60 |
 
 
 ## Per seed
@@ -56,8 +56,15 @@ Maths: `breakdown.md`
 | chrono | val | lpmc | 7 | 0.5399 | 0.002 | 0.95 | 0.5462 | 81.3% |
 | chrono | val | lpmc | 11 | 0.5698 | 0.002 | 0.88 | 0.5873 | 78.8% |
 | chrono | val | lpmc | 13 | 0.5201 | 0.002 | 1.01 | 0.5523 | 81.0% |
+| person | oof | swissmetro | 7 | 0.6565 | 0.297 | 1.07 | 0.6534 | 70.7% |
+| person | oof | swissmetro | 11 | 0.5550 | 0.397 | 1.10 | 0.5803 | 76.4% |
+| person | oof | swissmetro | 13 | 0.6192 | 0.399 | 1.09 | 0.6431 | 70.9% |
 | person | oof | optima | 7 | 0.3590 | 0.323 | 1.17 | 0.4321 | 83.6% |
+| person | oof | optima | 11 | 0.4621 | 0.002 | 1.02 | 0.5464 | 80.1% |
+| person | oof | optima | 13 | 0.3751 | 0.002 | 1.00 | 0.4008 | 84.6% |
 | person | oof | lpmc | 7 | 0.4345 | 0.615 | 1.16 | 0.4284 | 85.2% |
+| person | oof | lpmc | 11 | 0.5698 | 0.638 | 1.17 | 0.5569 | 78.5% |
+| person | oof | lpmc | 13 | 0.3920 | 0.560 | 1.06 | 0.4024 | 84.8% |
 | person | val | swissmetro | 7 | 0.6513 | 0.466 | 1.07 | 0.6534 | 70.6% |
 | person | val | swissmetro | 11 | 0.5546 | 0.002 | 1.01 | 0.5803 | 75.9% |
 | person | val | swissmetro | 13 | 0.6245 | 0.002 | 1.06 | 0.6431 | 72.0% |

@@ -34,13 +34,13 @@ Maths: `breakdown.md`
 
 | sentence channel alone | swissmetro: NLL | Δ vs ref | optima: NLL | Δ vs ref | lpmc: NLL | Δ vs ref |
 |---|---|---|---|---|---|---|
-| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | — | — | 0.5293 | +0.0000 [+0.0000, +0.0000] | 0.5262 | +0.0000 [+0.0000, +0.0000] |
-| `no_probe` no InfoNCE probe loss during pretraining | — | — | 0.4731 | — | 0.5266 | +0.0004 [-0.0159, +0.0157] |
+| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | 0.6986 | +0.0000 [+0.0000, +0.0000] | 0.5037 | +0.0000 [+0.0000, +0.0000] | 0.5498 | +0.0000 [+0.0000, +0.0000] |
+| `no_probe` no InfoNCE probe loss during pretraining | 0.7011 | +0.0024 [-0.0013, +0.0062] | 0.4992 | -0.0045 [-0.0153, +0.0066] | 0.5579 | +0.0082 [-0.0013, +0.0179] |
 
 | mixed with the structural model | swissmetro: NLL | Δ vs ref | π | optima: NLL | Δ vs ref | π | lpmc: NLL | Δ vs ref | π |
 |---|---|---|---|---|---|---|---|---|---|
-| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | — | — | — | 0.4121 | +0.0000 [+0.0000, +0.0000] | 0.21 | 0.4459 | +0.0000 [+0.0000, +0.0000] | 0.32 |
-| `no_probe` no InfoNCE probe loss during pretraining | — | — | — | 0.3574 | — | 0.20 | 0.4526 | +0.0067* [+0.0009, +0.0132] | 0.29 |
+| `full_model` full model (reference); sentence-only column = designed sentence model alone **(reference)** | 0.6087 | +0.0000 [+0.0000, +0.0000] | 0.18 | 0.4004 | +0.0000 [+0.0000, +0.0000] | 0.24 | 0.4708 | +0.0000 [+0.0000, +0.0000] | 0.29 |
+| `no_probe` no InfoNCE probe loss during pretraining | 0.6096 | +0.0009* [+0.0001, +0.0018] | 0.16 | 0.3995 | -0.0010 [-0.0036, +0.0020] | 0.24 | 0.4742 | +0.0034 [-0.0001, +0.0071] | 0.28 |
 
 
 ## Per seed
@@ -56,8 +56,15 @@ Maths: `breakdown.md`
 | chrono | val | lpmc | 7 | 0.5397 | 0.002 | 0.95 | 0.5933 | 81.3% |
 | chrono | val | lpmc | 11 | 0.5697 | 0.002 | 0.88 | 0.6283 | 78.8% |
 | chrono | val | lpmc | 13 | 0.5201 | 0.002 | 1.02 | 0.6333 | 81.0% |
+| person | oof | swissmetro | 7 | 0.6601 | 0.165 | 1.14 | 0.7328 | 70.8% |
+| person | oof | swissmetro | 11 | 0.5506 | 0.181 | 1.18 | 0.6486 | 76.1% |
+| person | oof | swissmetro | 13 | 0.6181 | 0.145 | 1.14 | 0.7217 | 72.1% |
 | person | oof | optima | 7 | 0.3574 | 0.195 | 1.19 | 0.4731 | 85.0% |
+| person | oof | optima | 11 | 0.4642 | 0.232 | 1.13 | 0.5701 | 79.1% |
+| person | oof | optima | 13 | 0.3768 | 0.280 | 1.19 | 0.4544 | 83.6% |
 | person | oof | lpmc | 7 | 0.4526 | 0.295 | 1.19 | 0.5266 | 83.9% |
+| person | oof | lpmc | 11 | 0.5729 | 0.320 | 1.23 | 0.6054 | 78.7% |
+| person | oof | lpmc | 13 | 0.3972 | 0.221 | 1.18 | 0.5419 | 84.6% |
 | person | val | swissmetro | 7 | 0.6700 | 0.002 | 1.01 | 0.7328 | 70.3% |
 | person | val | swissmetro | 11 | 0.5545 | 0.002 | 1.01 | 0.6486 | 75.9% |
 | person | val | swissmetro | 13 | 0.6244 | 0.002 | 1.06 | 0.7217 | 72.0% |
