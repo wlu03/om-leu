@@ -39,3 +39,6 @@ experiments/data/
 
 # ablation/: per-run JSON (per-event NLL lists) stay local; results.md + README.md are tracked
 ablation/*/results/*.json
+
+# experiment package byte-code
+omleu_experiments/**/__pycache__/
