@@ -18,6 +18,21 @@ import omleu_experiments.e4.register  # noqa: F401,E402
 import omleu_experiments.e6.register  # noqa: F401,E402
 import omleu_experiments.e7.register  # noqa: F401,E402
 
+from .e3.consistency_reader import ConsistencyAxisReader
+from .readers import READERS as _READERS
+_READERS["consistency_axis"] = ConsistencyAxisReader
+
+for _name, _kw, _note in (
+    ("consistency_none", {"lam_para": 0.0, "lam_order": 0.0, "lam_local": 0.0}, "axis reader, no consistency loss"),
+    ("consistency_para", {"lam_para": 0.3, "lam_order": 0.0, "lam_local": 0.0}, "paraphrase loss only"),
+    ("consistency_edit", {"lam_para": 0.0, "lam_order": 0.3, "lam_local": 0.1}, "intervention losses only"),
+    ("consistency_both", {"lam_para": 0.3, "lam_order": 0.3, "lam_local": 0.1}, "paraphrase and intervention losses"),
+):
+    registry.register(Variant(f"e3_{_name}", reader="consistency_axis",
+                              reader_kw={"sensitivity": "global", **_kw}, sentence_source="template",
+                              group="core", notes=_note))
+SUITES["e3"] = [f"e3_{n}" for n in ("consistency_none", "consistency_para", "consistency_edit", "consistency_both")]
+
 # combined model: grounded-allowlist templates read by the axis model, trained mixture-aware
 registry.register(Variant("combined_axis_template_mixture_aware", reader="mixture_aware",
                           reader_kw={"base": "axis", "base_kw": {"sensitivity": "global"}},

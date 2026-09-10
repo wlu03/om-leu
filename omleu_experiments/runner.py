@@ -205,11 +205,16 @@ def run_variant(dataset: str, master_seed: int, protocol: str, variant: Variant,
                                         person_effects=person_effects, use_boost=variant.use_boost)
     U_test = numeric_cache[nk].logits
     Q_test = None
+    behavioural = None
     if variant.reader is not None:
         reader = READERS[variant.reader](**variant.reader_kw); reader.n_members = members
         bv_sem = restandardise_covariates(fold_view(bs, f_rows, v_rows, test_rows))
         reader.fit(bv_sem, master_seed * 17 + 999)
         Q_test = reader.logprobs(bv_sem, test_rows)
+        if hasattr(reader, "behavioural_report"):
+            # held-out paraphrase families and edit magnitudes; a behavioural check, not a
+            # counterfactual choice observation
+            behavioural = reader.behavioural_report(bv_sem, test_rows)
     if gate_cal is not None:
         lp_final = apply_conditional_gate(U_test, Q_test, gate_context(b, test_rows), gate_cal)
     else:
@@ -242,6 +247,7 @@ def run_variant(dataset: str, master_seed: int, protocol: str, variant: Variant,
                       "n_test_clusters": int(len(set(clusters[test_rows].tolist())))},
         "calibration": cal, "calibration_numeric_only": cal_numeric_only, "calibration_gate": gate_cal,
         "metrics_final": m_final, "metrics_numeric_only": m_numeric, "metrics_semantic_only": m_sem,
+        "behavioural": behavioural, "reader_info": getattr(reader, "info", None) if variant.reader else None,
         "smoke": smoke, "members": members, "seconds": time.time() - t0,
         "environment": art.environment_fingerprint(Path(__file__).resolve().parents[1]),
     }
