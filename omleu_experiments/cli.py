@@ -19,7 +19,7 @@ import numpy as np
 
 from . import artifacts as art
 from .protocol import ordering_support
-from .registry import SUITES, VARIANTS
+from .matrix import SUITES, VARIANTS   # importing the matrix registers every experiment
 from .runner import ORDER_KIND, Variant, cluster_ids, person_strings, run_variant
 
 
