@@ -45,7 +45,7 @@ def quantities(text: str) -> List[str]:
 
 
 NEGATION = ("not ", "no ", "does not", "cannot")
-UNCERTAINTY = ("not recorded", "not established", "unknown", "does not establish")
+EVIDENCE_WORDS = ("record", "establish", "known", "unknown")
 
 
 def preserves_claims(a: str, bb: str) -> bool:
@@ -58,5 +58,7 @@ def preserves_claims(a: str, bb: str) -> bool:
     if quantities(a) != quantities(bb):
         return False
     neg = lambda t: any(m in t.lower() for m in NEGATION)
-    unc = lambda t: any(m in t.lower() for m in UNCERTAINTY)
+    # "evidence status" is asserted when the sentence denies that something is recorded,
+    # established or known, however it words that denial
+    unc = lambda t: neg(t) and any(w in t.lower() for w in EVIDENCE_WORDS)
     return neg(a) == neg(bb) and unc(a) == unc(bb)
