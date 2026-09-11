@@ -71,7 +71,8 @@ class PrefBranch(nn.Module):
     def __init__(self, b: Bundle, *, r: int = 32, M: int = 5, T: int = 1, attn: str = "person",
                  head_hidden: int = 0, w_hidden: int = 32, slot_drop: float = 0.15, person_input: str = "Z",
                  proj_drop: float = 0.1, weights: str = "net", proj: bool = True, probe: bool = True):
-        """``weights``: "net" (person weights over the M heads from z_i) or "uniform" (1/M, ablation);
+        """``weights``: "net" (person weights over the M heads from z_i), "global" (one learned
+        weight vector shared by every person) or "uniform" (fixed 1/M, ablation);
         ``proj=False`` drops the low-rank projection (heads act on the LayerNormed d-dim embedding);
         ``probe=False`` drops the InfoNCE probe (``probe_logits`` returns None, so no auxiliary loss)."""
         super().__init__()
@@ -99,6 +100,11 @@ class PrefBranch(nn.Module):
             raise ValueError(attn)
         if weights == "net":
             self.weights = nn.Sequential(nn.Linear(pz, w_hidden), nn.ReLU(), nn.Linear(w_hidden, M))
+        elif weights == "global":
+            # one learned weighting of the M heads, identical for every person: separates
+            # "the model learned which topics matter" from "the model learned it per person"
+            self.weights = None
+            self.global_w = nn.Parameter(torch.zeros(M))
         elif weights == "uniform":
             self.weights = None
         else:
@@ -140,7 +146,12 @@ class PrefBranch(nn.Module):
         H = self.project(b, idx)
         Hp = self.pool(H, z)                                      # (n,J,r)
         A = self.heads(Hp)                                        # (n,J,M)
-        wl = self.weights(z) if self.weights is not None else torch.zeros(len(z), self.M, device=A.device)  # (n,M)
+        if self.weights is not None:
+            wl = self.weights(z)                                   # (n,M) person-specific
+        elif self.weights_mode == "global":
+            wl = self.global_w[None, :].expand(len(z), self.M)     # (n,M) shared across persons
+        else:
+            wl = torch.zeros(len(z), self.M, device=A.device)      # uniform 1/M
         if self.T == 1:
             w = torch.softmax(wl, -1)
             return (A * w[:, None, :]).sum(-1)[:, None, :]        # (n,1,J)
