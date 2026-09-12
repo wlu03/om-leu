@@ -55,8 +55,10 @@ def discover() -> Dict[str, object]:
     return out
 
 
-def build(mod, protocol: str, pi: str):
-    kw = {**FULL, **PROTOCOLS[protocol], **PI_FITS[pi], **mod.CONFIG}
+def build(mod, protocol: str, pi: str, extra: Optional[dict] = None):
+    """``extra`` carries dataset-level overrides, e.g. ``boost_off`` where the boosted
+    residual's one-booster-per-alternative shape does not apply."""
+    kw = {**FULL, **PROTOCOLS[protocol], **PI_FITS[pi], **mod.CONFIG, **(extra or {})}
     cfg = Config(**kw)
     return lambda b, seed: _build(b, seed, cfg)
 

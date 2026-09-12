@@ -29,6 +29,10 @@ def main() -> None:
     ap.add_argument("--pi", nargs="+", default=["val"])
     ap.add_argument("--threads", type=int, default=6)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--boost-off", action="store_true",
+                    help="disable the Stage-2 boosted residual (datasets whose alternatives are not a "
+                         "fixed canonical set, such as product choice, where one booster per "
+                         "alternative is not defined)")
     args = ap.parse_args()
     names = list(mods) if args.ablations == ["all"] else args.ablations
     torch.set_num_threads(args.threads)
@@ -44,7 +48,8 @@ def main() -> None:
                         out.parent.mkdir(parents=True, exist_ok=True)
                         t0 = time.time()
                         try:
-                            model, run = build(mods[name], protocol, pi)(b, seed)
+                            extra = {"boost_off": True} if args.boost_off else None
+                            model, run = build(mods[name], protocol, pi, extra)(b, seed)
                             info = run(model, b, seed)
                             m = evaluate(model, getattr(model, "data_view", None) or b, "test")
                         except Exception:
