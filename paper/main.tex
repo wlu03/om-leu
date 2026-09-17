@@ -1,8 +1,7 @@
 % ---------------------------------------------------------------------------
-% Submission template.  The style file shipped here is the most recent one the
-% ICLR Master-Template repository serves; replace it with the current year's
-% file (and this \usepackage line) before submitting -- nothing else changes.
-% Build:  tectonic -X compile main.tex      (or pdflatex + bibtex + pdflatex x2)
+% The style file here is the most recent one the ICLR Master-Template repository
+% serves; replace it and this \usepackage line with the current year's file before
+% submitting.  Build:  tectonic -X compile main.tex
 % ---------------------------------------------------------------------------
 \documentclass{article}
 \usepackage{iclr2025_conference,times}
@@ -15,46 +14,47 @@
 \usepackage[capitalize]{cleveref}
 \usepackage{multirow}
 
-\newcommand{\nats}[1]{#1}
 \newcommand{\dataset}[1]{\textsc{#1}}
 
-\title{What Do LLM-Generated Consequences Add to Choice Models?\\A Controlled Study}
+\title{Outcome-Conditioned Utility:\\Identifying What Generated Consequences Contribute to Choice Models}
 
 \author{Anonymous authors\\Paper under double-blind review}
-
-\newcommand{\fix}{\marginpar{FIX}}
-\newcommand{\new}{\marginpar{NEW}}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Language models are increasingly used to write descriptions of what an option would
-mean for a particular person, which are then embedded and used as features in a
-behavioural model. We ask what those descriptions actually contribute. Using a
-three-stage pipeline -- an interpretable random-utility model, a shape-constrained
-boosted residual, and a language channel combined with them at the probability level --
-we separate three quantities that are usually reported as one: what \emph{any} second
-predictor contributes, what the \emph{text} contributes, and what the \emph{reader
-architecture} contributes. On three travel-mode datasets and one retail dataset,
-evaluated with respondent-disjoint splits and out-of-fold calibration, the text is worth
-\nats{0.029} nats on \dataset{LPMC} and nothing on \dataset{Optima}; a matched channel
-containing no text attracts a \emph{larger} mixture weight than the text does; and an
-ordinary two-layer network on the same embeddings matches or beats the designed reader
-everywhere. We introduce a uniform-floor control, which replaces the language channel by the uniform
-distribution at the same fitted weight and is strictly stronger than the shuffled,
-identity-text and random-embedding controls in common use: on two of four datasets the
-apparent gain survives those three and fails this one. Under the only time-respecting split
-our data support, the effect disappears and a shuffled control matches it. Four proposed
-improvements give no gain, and we report the diagnostics that explain why. An audit of the
-generation inputs finds statistics derived from the respondent's own choices inside the
-prompt, and $2.4$--$26.3\%$ of sentences asserting claims the evidence does not establish.
+Discrete choice models are increasingly augmented with text that a language model writes
+about what each alternative would mean for the individual facing the decision, on the
+premise that the text supplies perceptual content the tabulated attributes omit. The
+standard evidence for that premise is an improvement in held-out log-likelihood. We show
+that this evidence is insufficient in three separate ways, and supply the procedure that
+replaces it. First, a parameter-matched channel containing no text attracts a
+\emph{larger} fitted mixture weight than the text channel does, so weight is not content.
+Second, mixing any distribution into a sharp model bounds its log loss, and on two of our
+four datasets that bound accounts for the entire apparent gain; we introduce a
+weight-matched uninformative-channel control that isolates it, and show it is strictly
+stronger than the shuffled, identity-text and random-embedding controls in use. Third, a
+deterministic template built from exactly the recorded attributes predicts at least as
+well as the generated text whenever the text channel is scored alone. We then give the
+positive procedure: erase from the text representation every direction linearly
+predictable from the alternative's attributes, its identity and the person covariates, so
+that any surviving contribution cannot be a linear restatement of what the generator was
+shown, and stack the mixture weight out of fold rather than setting it by hand. Under
+respondent-disjoint evaluation the identified contribution is $0.017$ nats on London
+travel choices, with the interval excluding zero, and indistinguishable from zero on Swiss
+trip choices. We report what erasure costs, which quantifies how much of the raw gain was
+restatement: on London, $40\%$. Four proposed improvements to the text channel produce no
+gain, and we give the diagnostics that explain each failure. We conclude that a claim that
+generated text carries information beyond the attributes it was generated from requires
+this procedure rather than a likelihood comparison.
 \end{abstract}
 
 \input{sections/intro}
 \input{sections/related}
 \input{sections/method}
 \input{sections/protocol}
+\input{sections/identification}
 \input{sections/results}
 \input{sections/negative}
 \input{sections/discussion}

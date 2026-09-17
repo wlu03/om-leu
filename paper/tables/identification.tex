@@ -1,0 +1,16 @@
+\begin{tabular}{llccc}
+\toprule
+dataset & channel & NLL & its control & difference [95\% CI] \\
+\midrule
+Optima & no orthogonalisation & 0.4003 & 0.4019 & +0.0016 [-0.0039, +0.0069] \\
+ & erasure & 0.4008 & 0.4018 & +0.0010 [-0.0020, +0.0043] \\
+ & residual offset & 0.3982 & 0.3975 & -0.0007 [-0.0057, +0.0041] \\
+ & erasure + residual offset & 0.4002 & 0.3983 & -0.0019 [-0.0051, +0.0015] \\
+\addlinespace
+LPMC & no orthogonalisation & 0.4707 & 0.5004 & +0.0297$^{*}$ [+0.0160, +0.0454] \\
+ & erasure & 0.4830 & 0.4998 & +0.0169$^{*}$ [+0.0073, +0.0267] \\
+ & residual offset & 0.5011 & 0.5487 & +0.0476$^{*}$ [+0.0280, +0.0699] \\
+ & erasure + residual offset & 0.4751 & 0.5001 & +0.0251$^{*}$ [+0.0135, +0.0371] \\
+\addlinespace
+\bottomrule
+\end{tabular}

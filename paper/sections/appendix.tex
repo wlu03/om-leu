@@ -2,6 +2,42 @@
 \label{app:extra}
 
 \begin{table}[h]
+\caption{Readers given identical information, respondent-disjoint protocol, three seeds.}
+\label{tab:structural}
+\centering\small
+\input{tables/structural}
+\end{table}
+
+\begin{table}[h]
+\caption{Removing one component at a time, respondent-disjoint protocol, out-of-fold weight,
+three seeds. Positive means the removal hurts. Order within each block is Swissmetro, Optima,
+LPMC.}
+\label{tab:knockouts}
+\centering\small
+\input{tables/knockouts}
+\end{table}
+
+\section{Why a component can matter alone and not in the pool}
+\label{app:weights}
+\label{sec:why-weights}
+
+The largest knock-out in \Cref{tab:knockouts} disappears when the channel is pooled, and the
+explanation is measurable. The personalisation is genuine: the learned weights vary across
+people (standard deviation $0.23$ on one head, range $0.92$, $65\%$ sharing a top-weighted
+head), and a variant that learns \emph{one} weight vector shared by everybody recovers none of
+the loss ($0.5626$ against $0.5628$ for fixed uniform weights and $0.5262$ for the personalised
+version). The loss is a tail rather than a shift: the worst tenth of events carries $+0.97$ on
+\dataset{Optima} and $+0.53$ on \dataset{LPMC} while the rest carries $+0.05$ and $-0.02$, and
+those tail events are ones the attribute model already ranks correctly ($72\%$ and $67\%$).
+\Cref{eq:floor} bounds what such a failure can cost in the pool, and the first-order sensitivity
+is the standalone change multiplied by $\rho = \pi q_y/p_y$, which collapses exactly where the
+ablated channel collapses. Measured attenuation: $25.9\times$ on \dataset{Optima},
+$21.9\times$ on \dataset{LPMC}. The component raises average accuracy without changing which
+events the text channel wins -- its win rate is $36.2\%$ before the ablation and $36.1\%$ after
+-- and that is what a probability pool discards.
+
+
+\begin{table}[h]
 \caption{Fitted mixture weight $\pi$ by channel, respondent-disjoint protocol. A channel with no
 text at all attracts the largest weight on every dataset.}
 \label{tab:pi}
@@ -39,6 +75,27 @@ A frozen source-trained scorer is worse than fitting on the target in all six di
 parameters are a reasonable initialisation rather than a transferable notion of outcome level.
 The learning curves (\Cref{tab:curve}) show templated facts leading generated text at every
 training size, with the gap narrowing as data grows.
+
+\section{Limitations in full}
+\label{app:limits}
+
+\paragraph{Limitations.} The travel datasets are public case studies with a few hundred to a
+thousand respondents, and intervals condition on the observed split. The \dataset{Amazon} run
+uses a smaller generator on a hundred-respondent fixture, so it establishes the bound effect in
+a second domain but nothing quantitative across domains. Two arms are incomplete. A prompt
+designed to separate supported outcomes from unverified judgements is written and validated but
+not run at scale, for want of a generation budget; what we can report is that a mechanical scan
+of the existing text finds $2.4$--$26.3\%$ of sentences asserting claims the supplied evidence
+does not establish (\Cref{sec:audit}). And an extension representing outcomes as distributions
+rather than points is implemented and tested on synthetic fixtures with no empirical arm, since
+no dataset here records repeated journeys, scenario probabilities or elicited beliefs.
+
+\paragraph{The design that would settle it.} Withhold a designated subset of attributes from
+the generator, so that the surviving contribution is identified by an exclusion restriction
+rather than by a linear projection, and elicit from people the consequences they actually
+considered, so that the word \emph{perceived} is tied to a measurement. Neither is run here.
+Together they are what would convert a conditional predictive claim into a claim about
+perception.
 
 \section{Audit of the generation inputs}
 \label{sec:audit}

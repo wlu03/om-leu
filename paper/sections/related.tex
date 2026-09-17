@@ -1,26 +1,50 @@
 \section{Related work}
 
-\paragraph{Discrete choice models.} The conditional logit \citep{mcfadden1974} remains the
-reference model, with the mixed logit \citep{mcfadden2000mixed} relaxing its independence
-assumption. Recent work replaces parts of the utility with learned functions while keeping the
-random-utility form: taste parameters as functions of covariates \citep{han2022tastenet},
-alternative-specific architectures \citep{wang2020deep}, a learned term added to a specified
-utility \citep{sifringer2020enhancing}, and one boosted ensemble per alternative under a shared
-softmax \citep{salvade2024rumboost}. \citet{hillel2021systematic} benchmark these against
-unconstrained classifiers and document how sensitive the ranking is to the split, which is the
-sensitivity our protocol section addresses.
+\paragraph{Latent constructs in choice models.} The idea that utility is composed over
+quantities the analyst does not observe is the integrated choice and latent variable model
+\citep{benakiva2002hybrid,walker2002grum}, and that literature has already settled what
+counts as evidence for it. A latent construct is accepted when it is tied to the data by a
+measurement equation with stated normalisations \citep{daly2012ordered}, when identification
+is checked rather than assumed \citep{raveau2012identifiability}, and when the analyst
+concedes that a better fit is not itself evidence of the construct
+\citep{vij2016latently,chorus2014impossibility}. Our formulation in \Cref{sec:method} is an
+instance of that family in which the measurement equation is a frozen language model, and we
+adopt its standards rather than proposing new ones. Within the neural branch, taste
+parameters have been made functions of covariates \citep{han2022tastenet}, a learned term has
+been added to a specified utility \citep{sifringer2020enhancing}, and one boosted ensemble has
+been fitted per alternative under a shared softmax \citep{salvade2024rumboost}.
+\citet{hillel2021systematic} document how sensitive the resulting rankings are to the split,
+which is the sensitivity our protocol addresses.
 
-\paragraph{Language models as feature generators.} A separate line uses language models either as
-direct predictors of behaviour \citep{brand2023using,horton2023large} or as generators of text
-that a downstream model reads; the pipeline we study belongs to the second family. Our concern is
-not whether such features help but what the reported help consists of, which places this work
-closer to the literature on controls and leakage \citep{kapoor2023leakage} than to the modelling
-literature.
+\paragraph{Concept bottlenecks and their leakage.} Routing a prediction through a named
+intermediate layer is the concept bottleneck model \citep{koh2020concept}. That its soft
+activations carry information beyond the named concepts is established
+\citep{mahinpei2021promises}, as is the decomposition of the resulting accuracy gap into a
+violated Markov assumption and an inflexible concept predictor, with an explicit side-channel
+as the legitimate place for the remainder \citep{havasi2022addressing}. Post-hoc concept
+bottleneck models make the same point empirically: the residual channel can supply nearly all
+of the accuracy while the concept layer supplies the interpretation \citep{yuksekgonul2023post}.
+A design in which an interpretable channel is added to an unconstrained one, with the second
+up-weighted, is that side-channel under another name, and the number that has to be reported
+is the interpretable channel's accuracy with the side-channel removed. Using a language model
+to write the concept vocabulary is likewise established \citep{oikarinen2023labelfree,yang2023labo}.
 
-\paragraph{Combining and calibrating.} Mixing predictive distributions is standard
-\citep{wolpert1992stacked}, and stacking on out-of-fold predictions has known guarantees
-\citep{vanderlaan2007super,yao2018using}. A linear pool is usually no worse than its components in
-expectation, which is exactly why a mixture gain is weak evidence about the added component -- the
-observation our uniform-floor control formalises. Temperature scaling
-\citep{guo2017calibration} is the correction we apply to the conventional channel, fitted with the
-same budget as the mixture weight so the baseline is not handicapped.
+\paragraph{Erasure.} Removing a linear subspace so that a downstream reader cannot recover it
+runs from partialling out \citep{lovell1963seasonal} to iterative nullspace projection
+\citep{ravfogel2020null} and the closed-form solution we use \citep{belrose2023leace}. Its
+limits are known: guardedness under a linear probe does not imply guardedness under a
+multinomial logit head \citep{ravfogel2023loglinear}, and nonlinear erasure remains unsolved
+\citep{ravfogel2022kernelized}. We use erasure as an identification device and claim nothing
+about the technique.
+
+\paragraph{Combination and controls.} Pooling predictive distributions
+\citep{wolpert1992stacked} with weights fitted out of fold \citep{vanderlaan2007super,
+yao2018using} is standard, and \citet{geweke2011optimal} show a positive fitted weight is not
+evidence that a component is informative. Controls that hold information fixed while removing
+content have a long history outside this area: control tasks for probing
+\citep{hewitt2019designing}, permutation tests within class \citep{ojala2010permutation}, and
+random-feature baselines \citep{stoppiglia2003ranking}. Within text-feature work, hand-written
+templates have been found to match language-model serialisations of the same fields
+\citep{hegselmann2023tabllm} and random character strings to recover the gains attributed to
+generated descriptors \citep{roth2023waffling}. The one control we could not find a precedent
+for is the weight-matched uninformative channel of \Cref{sec:controls}.

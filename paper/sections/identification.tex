@@ -1,0 +1,49 @@
+\section{Identification by erasure}
+\label{sec:identification}
+
+The controls of \Cref{sec:controls} can show that a gain is not combination arithmetic and not
+generic text. They cannot show that it is not a restatement of the attributes, because the
+generator was shown the attributes and the text may encode them in a form the reader recovers.
+We address that directly.
+
+\paragraph{Construction.} Before the reader sees anything, each embedding is residualised on
+the concept vector $c_{ij} = [\,1,\ \tilde x_{ij},\ z_i\,]$ with a separate least-squares map
+per (slot $k$, canonical alternative $a$), fitted on the training rows:
+\begin{equation}
+e'_{ijk} \;=\; e_{ijk} - c_{ij}^{\top} W_{k,\,a(ij)},
+\qquad
+W = \arg\min_W \; \lVert E - cW \rVert^2 \ \text{on training rows}.
+\label{eq:erase}
+\end{equation}
+Fitting per alternative also removes the per-alternative mean, so on the training rows the
+residual is uncorrelated with the attributes, the alternative identity and the covariates, and
+no linear reader recovers any of them. The shuffled control of an erased variant shuffles the
+\emph{already erased} embeddings, so the control cannot reintroduce the attributes through the
+subtracted term.
+
+\paragraph{Verification.} A ridge probe on the concatenated slot embeddings recovers time,
+cost, alternative identity and covariates with $R^2$ between $0.70$ and $0.99$ before erasure
+and $0.000$ after, on both training and held-out rows; identity accuracy falls from $100\%$ to
+chance. On \dataset{Amazon}, where the alternatives are catalogue products, price is recovered
+at $R^2 = 0.50$ on held-out rows before erasure and $0.000$ after. That the generated text
+encodes the price of the product it describes at half the held-out variance is itself the
+quantitative form of the restatement concern.
+
+\paragraph{What survives is the estimand.} After \Cref{eq:erase} the difference between the
+text channel and its own shuffled control is a contribution that is, by construction, not
+linearly recoverable from the alternative's attributes, its identity or the person covariates.
+We report that difference as the identified contribution, and we report the difference between
+the erased and unerased channels as the part of the raw gain that \emph{was} restatement.
+
+\paragraph{A second device.} Independently of erasure, a member can be trained with
+$\nu\,L_{ij}$ added to its utilities as a fixed offset, where $L$ is the cross-fitted attribute
+log-probability. The member is then optimised only on what the attribute model does not
+already predict. This targets redundancy rather than restatement, and we report it alongside.
+
+\paragraph{Scope.} Erasure is linear. The claim is that the surviving contribution is not
+linearly recoverable from the conditioning set; a nonlinear reader might still recover
+something, and guardedness under a linear probe does not imply guardedness under a multinomial
+logit head \citep{ravfogel2023loglinear}. We state this rather than overclaim, and we note the
+stronger design that would remove the caveat: withhold a designated attribute subset from the
+generator entirely, so that an exclusion restriction rather than a projection does the work. We
+have not run that design.

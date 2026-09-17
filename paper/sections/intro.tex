@@ -1,64 +1,62 @@
 \section{Introduction}
 
-A growing body of work replaces or augments the hand-specified attributes of a behavioural
-model with text produced by a language model: a short description of what each available
-option would mean for the individual facing the decision. The text is embedded by a frozen
-sentence encoder, read by a small learned network, and combined with a conventional model.
-Reported gains are real in the sense that the combined system scores better than the
-conventional model alone. What is usually left open is \emph{why}.
+A choice model predicts which alternative a person selects from an available set. A growing
+body of work adds to such a model a channel that reads text: a language model is asked what
+each alternative would mean for this person, the answer is embedded by a frozen encoder, and
+a small network reads the embedding. The motivation is that people choose on perceived
+consequences rather than on tabulated attributes, and that the tabulated attributes do not
+encode those consequences. The evidence offered is almost always the same: the combined
+system attains a better held-out log-likelihood than the model without the text.
 
-Three explanations are compatible with the same measurement, and they have different
-consequences for what one should build next.
+That evidence does not establish the premise. Three mechanisms produce the same measurement,
+and they call for different conclusions.
 
-\begin{enumerate}
-\item \textbf{Ensembling.} Combining two models that make partly independent errors improves
-      a proper score, whatever the second model reads. If this is the explanation, the text is
-      incidental and a second numeric model would do as well.
-\item \textbf{Information.} The text carries something the attributes do not -- a reading of
-      the situation, a consequence the tabulated columns do not encode. This is the claim the
-      literature usually makes.
-\item \textbf{Architecture.} The gain comes from how the text is read: axis-wise scoring,
-      attention over sentences, person-specific valuation. This is what most method sections
-      describe at length.
-\end{enumerate}
+\textbf{Combination.} Pooling two predictive distributions improves a proper score whenever
+their errors differ, whatever the second one reads. Worse, the improvement is partly
+guaranteed: since $p = (1-\pi) q + \pi r \geq (1-\pi) q$, the log loss of the pool exceeds
+that of the base model by at most $-\log(1-\pi)$ on any event, so a channel that predicts at
+chance still improves a base model that is confidently wrong somewhere.
 
-We take an existing three-stage pipeline of this kind and measure all three quantities
-separately. The pipeline is not our contribution and we do not argue for it; it is a
-representative instance, and holding it fixed is what makes the comparisons clean. Every
-variant in this paper sees the same generated sentences, the same encoder, the same
-conventional model and the same ensembling budget. Only the named component changes.
+\textbf{Restatement.} The generator is shown the attributes. Text derived from them may
+carry nothing else, in which case the text channel is a re-encoding of columns the base model
+already has.
 
-Our findings are largely corrective.
+\textbf{Content.} The text carries something the attributes do not.
 
-\textbf{A matched channel with no text attracts more weight than the text.} The fitted
-mixture weight on the language channel is $0.21$--$0.40$ across datasets, but a
-parameter-matched numeric channel with no language input at all receives $0.37$--$0.52$
-(\Cref{tab:pi}). The mixture weight is a measure of wanting a second opinion, not of
-linguistic content, and should not be reported as evidence for the latter.
+Only the third supports the premise, and separating it from the first two requires controls
+that the literature on this family of models does not run. We supply them, and we supply the
+positive procedure that makes a content claim identifiable rather than asserted.
 
-\textbf{The reader architecture is not the source of the gain.} An ordinary two-layer network
-on the same embeddings matches the designed reader on all three travel datasets and beats it
-on two (\Cref{tab:structural}). Inside the designed reader, the component we had described as
-modelling individual taste -- person-specific weights over named attribute heads -- can be
-replaced by a constant with no measurable effect on the deployed system, and we give the
-measurement that explains why (\Cref{sec:why-weights}).
+\paragraph{What we do.} We hold one representative pipeline fixed -- a random-utility model, a
+shape-constrained residual, and a text channel pooled with them -- and vary one component at a
+time. The pipeline is not our contribution; holding it fixed is what makes the comparisons
+clean. Every variant sees the same text, encoder, base model and ensembling budget.
 
-\textbf{A control the field does not use overturns one positive result.} Shuffled sentences,
-identity-only text and random embeddings are all trained models producing non-uniform
-predictions; none of them isolates the fact that mixing \emph{anything} into a sharp model
-bounds its loss. Replacing the language channel by the uniform distribution at the same
-fitted weight is strictly stronger. Two of our four datasets pass the usual three controls
-and fail this one (\Cref{tab:floor}).
+\paragraph{Findings.}
+\begin{itemize}
+\item The fitted mixture weight is not a measure of content. The text channel receives
+      $\pi = 0.21$--$0.40$ across datasets; a parameter-matched channel containing \emph{no}
+      text receives $0.37$--$0.52$ (\Cref{tab:pi}).
+\item A weight-matched uninformative-channel control separates the bound above from
+      information. On two of four datasets the entire apparent gain is the bound
+      (\Cref{tab:floor}), and this is invisible to the shuffled, identity-text and
+      random-embedding controls in use, because each of those is itself a trained model
+      producing a non-uniform distribution.
+\item A deterministic template containing exactly the recorded quantities predicts at least
+      as well as the generated text whenever the channel is scored alone (\Cref{tab:main}).
+\item After erasing from the text representation every direction linearly predictable from
+      the alternative's attributes, its identity and the person covariates, a contribution
+      of $0.017$ nats survives on \dataset{LPMC} with the interval excluding zero, and
+      nothing survives on \dataset{Optima} (\Cref{tab:identification}). The cost of erasure
+      measures how much of the raw gain was restatement: on \dataset{LPMC}, $40\%$.
+\item No designed reader beats an ordinary two-layer network given the same information
+      (\Cref{tab:structural}), and four proposed improvements produce no gain
+      (\Cref{sec:negative}).
+\end{itemize}
 
-\textbf{The effect is protocol-dependent.} On the single dataset whose ordering field is
-genuine calendar time, a time-respecting split reverses the ranking: the shuffled control
-beats the real text and a text-free channel beats both (\Cref{tab:protocol}). We also show
-that two of our three datasets cannot support a time-respecting protocol at all, because
-their apparent timestamps are a questionnaire task index and a date manufactured by a
-preparation script.
-
-Alongside these we report four proposals that did not work, each with the diagnostic that
-explains the failure rather than a bare number, and an audit of the generation inputs which
-found statistics derived from the respondent's own choices inside the prompt. All numbers in
-this paper are recomputed from per-event predictions saved for every run; the script that
-writes every table is released with the code.
+\paragraph{Scope of the claim.} Erasure is linear, so ``not a restatement'' means not
+linearly recoverable from the conditioning set; exhaustive nonlinear erasure is not available
+\citep{ravfogel2022kernelized}. We do not use the word \emph{mediated}: mediation carries an
+identification assumption \citep{imai2010general} that none of our designs tests. We say
+\emph{outcome-conditioned}, and we state in \Cref{sec:discussion} what that does and does not
+license.

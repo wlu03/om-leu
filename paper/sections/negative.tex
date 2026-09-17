@@ -1,86 +1,62 @@
 \section{Four proposals that did not work}
 \label{sec:negative}
 
-Each of the following was motivated by a diagnosis of why the language channel underperforms.
-We report them because the diagnoses are testable and the failures are informative; \Cref{tab:improvements} in \Cref{app:extra} gives the four numbers.
+Each of the following was motivated by a diagnosis of why the text channel underperforms; we
+report them because the diagnoses are testable and the failures are informative.
+\Cref{tab:improvements} in \Cref{app:extra} gives the four numbers.
 
-\paragraph{Grounded generation.} If the generated text mixes supported outcomes with unverified
-judgements, separating them should help. We wrote a prompt that tags every sentence as
-\emph{observed}, \emph{derived} or \emph{unknown} and forbids invented quantities, affordability
-judgements and demographic inferences, with programmatic validators for schema, evidence
-vocabulary and numeral support. Regenerating under it needs a generation budget we did not have,
-so the comparison is recorded as blocked rather than as a negative result. What we can report is
-the audit of the existing generations (\Cref{sec:audit}) and the templated-facts control, which
-predicts \emph{better} than the generated text whenever the channel is scored alone.
+\paragraph{Grounded generation.} A prompt that tags every sentence as observed, derived or
+unknown and forbids invented quantities, affordability judgements and demographic inferences,
+with programmatic validators for schema, evidence vocabulary and numeral support. Running it at
+scale needs a generation budget we did not have, so the comparison is recorded as blocked rather
+than as a negative result. What we can report is that templated facts predict better than the
+generated text whenever the channel is scored alone.
 
 \paragraph{Consistency training.} If the representation tracks outcome magnitudes rather than
-wording, then raising a fare should lower the financial score and leave the time score alone, and
-a claim-preserving paraphrase should move nothing. We built an edit registry with units,
-eligibility rules and declared affected and unaffected axes, and paraphrase families that
-preserve quantities, negation polarity and evidence status, holding out families and edit
-magnitudes for evaluation. Training on these objectives produced no predictive gain in any
-configuration. More informative than the score: on held-out edit types the score moves in the
-wrong direction on $25$--$43\%$ of eligible events, and the ordering loss barely changes that.
-The representation is not behaviourally consistent, and making it more consistent did not make it
-more accurate.
+wording, raising a fare should lower the financial score and leave the time score alone, and a
+claim-preserving paraphrase should move nothing. We built an edit registry with units,
+eligibility rules and declared affected and unaffected axes, and paraphrase families preserving
+quantities, negation polarity and evidence status, holding out families and magnitudes for
+evaluation. Training on these objectives produced no predictive gain. More informative than the
+score: on held-out edit types the score moves in the wrong direction on $25$--$43\%$ of eligible
+events, and the ordering loss barely changes that. The representation is not behaviourally
+consistent, and making it more consistent did not make it more accurate.
 
-\paragraph{Complementarity-aware training.} If the language channel wastes capacity relearning
-what the conventional model knows, training it against held-out numeric predictions should
-redirect it. We fine-tune on
-$-\log\!\big((1-\pi_{\text{train}}) p^{\text{num}}_{y} + \pi_{\text{train}} q_{y}\big)$
-with the numeric side detached and produced by inner folds inside the outer training partition,
-so the language channel never sees numeric predictions that used those labels. The gradient
-identity
-$\nabla \mathcal{L}_{\text{mix}} = \rho \cdot \nabla(-\log q_y)$ with
-$\rho = \pi q_y / ((1-\pi)p_y + \pi q_y)$ is verified against autograd. The mixture did not
-improve, and the standalone scores became worse, which is the trade the objective makes but not
-the one we wanted.
+\paragraph{Complementarity-aware training.} Fine-tuning on
+$-\log((1-\pi_{\text{train}}) p^{\text{attr}}_{y} + \pi_{\text{train}} q_{y})$ with the
+attribute side detached and produced by inner folds inside the outer training partition. The
+gradient identity $\nabla \mathcal{L} = \rho\,\nabla(-\log q_y)$ with
+$\rho = \pi q_y / ((1-\pi)p_y + \pi q_y)$ is verified against autograd. The pool did not
+improve and the standalone scores became worse. Note that the erasure device of
+\Cref{sec:identification} targets a different quantity -- restatement rather than redundancy --
+and does produce a measurable effect.
 
-\paragraph{Conditional mixture gate.} If the text helps in identifiable situations, the weight
-should depend on context. A regularised logistic gate over history length, a missingness
-indicator and choice-set size, fitted only on held-out channel predictions and shrunk towards the
-global weight, spread the per-event weight from $0.15$ to $0.58$ and predicted no better than a
-single number. The control that matters: the same gate over a channel with no text scored $0.009$
-worse, so gate capacity is not a hidden source of gain.
-\label{sec:gate}
-For any claim about monotonicity of the complete pipeline, note that
+\paragraph{Conditional weight.} A regularised logistic gate over history length, a missingness
+indicator and choice-set size, fitted only on held-out channel predictions and shrunk towards
+the global weight, spread the per-event weight from $0.15$ to $0.58$ and predicted no better
+than a single number. The control that matters: the same gate over a channel with no text
+scored $0.009$ worse, so gate capacity is not a hidden source of gain. For any claim about
+monotonicity of the complete pipeline, note that
 $\partial p_j/\partial x = (1-\pi)\,\partial q_j/\partial x + \pi\,\partial r_j/\partial x +
-(r_j - q_j)\,\partial \pi/\partial x$; a sign constraint inside the residual binds only the first
-term.
+(r_j - q_j)\,\partial \pi/\partial x$; a sign constraint inside the residual binds only the
+first term.
 
-\subsection{Why the personalised weights vanish inside the mixture}
+\subsection{Why a component can matter alone and not in the pool}
 \label{sec:why-weights}
 
-The largest knock-out in \Cref{tab:knockouts} disappears when the channel is mixed, and the
-explanation is measurable rather than rhetorical.
-
-First, the personalisation is genuine: the learned weights vary across people (standard deviation
-$0.23$ on the reliability head, range $0.92$, only $65\%$ of people sharing a top-weighted head),
-and a variant that learns \emph{one} weight vector shared by everybody recovers none of the loss
-($0.5626$ against $0.5628$ for fixed uniform weights and $0.5262$ for the personalised version),
-with the shared vector converging to nearly flat. What the ablation removes is per-person
-allocation, not the ability to learn which axes matter.
-
-Second, the loss is a tail, not a shift. Sorting test events by how much the ablation hurts, the
-worst tenth carries $+0.97$ on \dataset{Optima} and $+0.53$ on \dataset{LPMC}, while the
-remaining nine tenths carry $+0.05$ and $-0.02$: on \dataset{LPMC} the ablated model is slightly
-\emph{better} on ninety per cent of events. Those tail events are ones the conventional model
-already ranks correctly ($72\%$ and $67\%$ respectively).
-
-Third, \Cref{eq:floor} bounds what such a failure can cost inside the mixture, and the first-order
-sensitivity of the mixture loss to the language channel is the standalone change multiplied by
-$\rho = \pi q_y/p_y$, which collapses exactly where the ablated channel collapses. Measured
-attenuation: $25.9\times$ on \dataset{Optima}, $21.9\times$ on \dataset{LPMC}.
-
-The design implication is specific. The personalised weights raise average accuracy without
-changing \emph{which} events the language channel wins -- its win rate against the conventional
-channel is $36.2\%$ before the ablation and $36.1\%$ after. A component that improves accuracy
-without moving that set is what a probability mixture discards.
+The largest knock-out disappears when the channel is pooled, and the reason is measurable
+rather than rhetorical. The personalisation is genuine: a variant that learns \emph{one} weight
+vector shared by everybody recovers none of the loss. But the loss is a tail rather than a
+shift, those tail events are ones the attribute model already ranks correctly, and
+\Cref{eq:floor} bounds what such a failure can cost in the pool. Measured attenuation is
+$25.9\times$ on \dataset{Optima} and $21.9\times$ on \dataset{LPMC}. The component raises
+average accuracy without changing which events the text channel wins, and that is what a
+probability pool discards. \Cref{app:weights} gives the numbers.
 
 \subsection{Transfer and sample size}
 
-A scorer trained on one dataset and frozen is worse than fitting on the target in all six ordered
-directions; fine-tuning recovers most of the difference, which says the transferred parameters are
-a reasonable initialisation rather than a transferable notion of outcome level. Learning curves
-that subsample whole households show templated facts leading generated text at every training
-size, with the gap narrowing as data grows. Both tables are in \Cref{app:extra}.
+A scorer trained on one dataset and frozen is worse than fitting on the target in all six
+ordered directions; fine-tuning recovers most of the difference, so the transferred parameters
+are a reasonable initialisation rather than a transferable notion of outcome level. Learning
+curves subsampling whole households show templated facts leading generated text at every
+training size. Both tables are in \Cref{app:extra}.

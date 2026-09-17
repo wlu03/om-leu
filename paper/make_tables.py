@@ -243,6 +243,76 @@ def table_pi():
     write("pi.tex", "\n".join(L))
 
 
+def table_identification():
+    """Each identified-channel variant against its OWN shuffled control."""
+    import subprocess
+    PAIRS = [("id_plain", "id_plain_shuffled", "no orthogonalisation"),
+             ("id_erase", "id_erase_shuffled", "erasure"),
+             ("id_resid", "id_resid_shuffled", "residual offset"),
+             ("id_erase_resid", "id_erase_resid_shuffled", "erasure + residual offset")]
+    import numpy as _np
+    res_dir = ROOT / "experiments" / "results"
+
+    def ev(variant, ds, seed):
+        f = res_dir / variant / f"{ds}_seed{seed}.json"
+        if not f.exists():
+            return None
+        d = json.loads(f.read_text())
+        return None if "error" in d else _np.array(d["per_event_nll"])
+
+    def cl(ds, seed, n):
+        try:
+            import sys as _s
+            _s.path.insert(0, str(ROOT))
+            from experiments.harness.data import load_bundle
+            from experiments.models.omleu2 import cold_start_view
+            b = load_bundle(ds, seed); bv = cold_start_view(b, seed); te = bv.idx("test")
+            if len(te) == n:
+                return _np.array([f"s{seed}:{int(p)}" for p in b.person[te].numpy()])
+        except Exception:
+            pass
+        return _np.array([f"s{seed}:{i}" for i in range(n)])
+
+    def paired(a, b_, c, draws=2000):
+        d = b_ - a
+        uniq = sorted(set(c.tolist())); pos = {x: i for i, x in enumerate(uniq)}
+        idx = [[] for _ in uniq]
+        for i, x in enumerate(c):
+            idx[pos[x]].append(i)
+        sums = _np.array([d[i].sum() for i in idx]); cnts = _np.array([len(i) for i in idx], dtype=float)
+        rng = _np.random.default_rng(0); dr = rng.integers(0, len(uniq), (draws, len(uniq)))
+        bt = sums[dr].sum(1) / _np.maximum(cnts[dr].sum(1), 1e-12)
+        lo, hi = _np.quantile(bt, [0.025, 0.975])
+        return float(d.mean()), float(lo), float(hi)
+
+    L = ["\\begin{tabular}{llccc}", "\\toprule",
+         "dataset & channel & NLL & its control & difference [95\\% CI] \\\\", "\\midrule"]
+    any_row = False
+    for ds in DS4:
+        first = True
+        for var, ctrl, label in PAIRS:
+            A, B, C, n = [], [], [], 0
+            for seed in (7, 11, 13):
+                a, b_ = ev(var, ds, seed), ev(ctrl, ds, seed)
+                if a is None or b_ is None or len(a) != len(b_):
+                    continue
+                A.append(a); B.append(b_); C.append(cl(ds, seed, len(a))); n += 1
+            if not n:
+                continue
+            a, b_, c = _np.concatenate(A), _np.concatenate(B), _np.concatenate(C)
+            m, lo, hi = paired(a, b_, c)
+            star = "$^{*}$" if (lo > 0 or hi < 0) else ""
+            name = PRETTY[ds] if first else ""
+            L.append(f"{name} & {label} & {a.mean():.4f} & {b_.mean():.4f} & "
+                     f"{m:+.4f}{star} [{lo:+.4f}, {hi:+.4f}] \\\\")
+            first = False; any_row = True
+        if not first:
+            L.append("\\addlinespace")
+    L += ["\\bottomrule", "\\end{tabular}"]
+    if any_row:
+        write("identification.tex", "\n".join(L))
+
+
 def table_floor():
     """The uniform-floor control: how much of the mixture gain is information."""
     f = OUT / "floor_control.json"
@@ -270,5 +340,6 @@ def table_floor():
 if __name__ == "__main__":
     print(f"artifact root: {AR}")
     for fn in (table_main, table_structural, table_knockouts, table_protocol,
-               table_improvements, table_transfer, table_curve, table_pi, table_floor):
+               table_improvements, table_transfer, table_curve, table_pi, table_floor,
+               table_identification):
         fn()

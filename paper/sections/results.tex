@@ -1,103 +1,92 @@
 \section{Results}
 \label{sec:results}
 
-\paragraph{Data.} Three travel-mode datasets -- \dataset{Swissmetro} ($9{,}036$ stated-preference
-tasks, $1{,}004$ respondents), \dataset{Optima} ($1{,}906$ reported trips, $1{,}486$ respondents),
-\dataset{LPMC} ($3{,}556$ London trips, $600$ respondents in $454$ households) -- and one retail
-dataset, \dataset{Amazon} ($1{,}183$ purchases, $99$ respondents), which we include because its
-alternatives are catalogue products rather than a fixed set and so stress the pipeline's
-assumptions. Sentences for the travel datasets come from a frozen $70$B model; the
-\dataset{Amazon} sentences come from a locally hosted $8$B model, so its absolute numbers are not
-comparable with the others while its internal contrasts are. Three master seeds per travel
-dataset, one for \dataset{Amazon}. Test sets are never touched until configurations are frozen.
+\paragraph{Data.} \dataset{Swissmetro} ($9{,}036$ tasks, $1{,}004$ respondents),
+\dataset{Optima} ($1{,}906$ trips, $1{,}486$ respondents), \dataset{LPMC} ($3{,}556$ London
+trips, $454$ households) and \dataset{Amazon} ($1{,}183$ purchases, $99$ respondents), the
+last because its alternatives are catalogue products. Travel text comes from a frozen $70$B
+model and \dataset{Amazon} text from a local $8$B model, so its absolute numbers are not
+comparable across domains while its internal contrasts are. Three seeds per travel dataset.
 
-\subsection{Three contributions, separated}
-
-\Cref{tab:main} adds one channel at a time to the same conventional model.
+\subsection{Combination, restatement, content}
 
 \begin{table}[t]
 \caption{Test negative log-likelihood, respondent-disjoint protocol, weight fitted out of fold,
-mean over seeds. Each row adds one channel to the same numeric model; controls are defined in
-\Cref{sec:controls}. The control channels were not run on \dataset{Amazon}, whose language channel
-predicts at chance (\Cref{tab:floor}).}
+mean over seeds. Each row adds one channel to the same attribute model; controls are defined
+in \Cref{sec:controls}.}
 \label{tab:main}
 \centering\small
 \input{tables/main}
 \end{table}
 
-A second numeric channel with no text is worth $0.011$ on \dataset{LPMC} and $0.019$ on
-\dataset{Optima}: ensembling alone accounts for a third to all of what is usually attributed to
-language. Against that line the generated text adds $0.021$ on \dataset{LPMC} and nothing on
-\dataset{Optima}. Templated facts recover most of the gain everywhere, which bounds what the
-\emph{generated} content can be worth.
+A second channel with no text is worth $0.011$ on \dataset{LPMC} and $0.019$ on
+\dataset{Optima}: combination alone accounts for a third to all of what is usually attributed
+to language. Against that line the generated text adds $0.021$ on \dataset{LPMC} and nothing
+on \dataset{Optima}. Templated facts recover most of the gain everywhere, which bounds what
+the generated content can be worth.
 
-The fitted mixture weight is not a measure of content. The language channel receives
-$\pi = 0.21$--$0.40$ across datasets, while a parameter-matched channel containing no text at all
-receives $0.37$--$0.52$, and under the time-respecting split of \Cref{tab:protocol} the text-free
-channel takes $0.85$ against the text's $0.70$. Weights for every channel are in \Cref{tab:pi}.
+The fitted weight is not a measure of content. The text channel receives $\pi = 0.21$--$0.40$;
+a parameter-matched channel containing no text receives $0.37$--$0.52$; under the
+time-respecting split the text-free channel takes $0.85$ against the text's $0.70$. Weights
+for every channel are in \Cref{tab:pi}.
 
-\subsection{The uniform-floor control}
-\label{sec:floor}
-
-\Cref{tab:floor} applies the control of \Cref{sec:controls}.
+\subsection{The weight-matched uninformative control}
 
 \begin{table}[t]
-\caption{Uniform-floor control (seed 7). ``Uniform floor'' replaces the language channel by the
-uniform distribution at the same fitted $\pi$. On \dataset{Swissmetro} and \dataset{Amazon} the
-gain survives the shuffled, identity and random controls but not this one.}
+\caption{Replacing the text channel by the uniform distribution at the same fitted $\pi$. On
+\dataset{Swissmetro} and \dataset{Amazon} the gain survives the shuffled, identity and random
+controls but not this one.}
 \label{tab:floor}
 \centering\small
 \input{tables/floor}
 \end{table}
 
-On \dataset{LPMC} and \dataset{Optima} the language channel is worth $0.13$ and $0.18$ nats more
-than a uniform distribution at the same weight: the content is real. On \dataset{Swissmetro} it
-is worth $-0.001$, and on \dataset{Amazon}, where the channel predicts at chance ($1.593$ against
-$1.609$), it is worth $0.018$ of a total mixture gain of $0.114$. In those two cases the gain is
-the bound in \Cref{eq:floor}, not information, and it is invisible to the controls in common use
-because those controls are themselves trained models.
+On \dataset{LPMC} and \dataset{Optima} the text channel is worth $0.13$ and $0.18$ nats more
+than a uniform distribution at the same weight. On \dataset{Swissmetro} it is worth $-0.001$,
+and on \dataset{Amazon}, where the channel predicts at chance ($1.593$ against $1.609$), it is
+worth $0.018$ of a total gain of $0.114$. In those two cases the gain is the bound of
+\Cref{eq:floor}.
+
+\subsection{Identification}
+
+\begin{table}[t]
+\caption{Each variant against its own shuffled control, respondent-disjoint protocol, weight
+fitted out of fold. The control shuffles the same processed embeddings, so the difference
+isolates content specific to the event. Erasure removes every direction linearly predictable
+from the attributes, the alternative identity and the covariates.}
+\label{tab:identification}
+\centering\small
+\input{tables/identification}
+\end{table}
+
+\Cref{tab:identification} is the central result. On \dataset{LPMC} the unerased channel beats
+its control by $0.030$; after erasure $0.017$ remains, with the interval excluding zero. The
+difference between those two numbers is the part of the raw gain that was linearly recoverable
+from the attributes: $40\%$ of it. Training against the attribute model's own predictions
+gives a larger surviving difference still. On \dataset{Optima} every contrast has an interval
+containing zero, the largest being $+0.0016$: there is no event-specific content to identify,
+and the small gain visible in \Cref{tab:main} is combination.
 
 \subsection{Architecture}
 
-\begin{table}[t]
-\caption{Sentence readers given identical information, respondent-disjoint protocol, mean over
-three seeds. The designed readers do not beat an ordinary two-layer network.}
-\label{tab:structural}
-\centering\small
-\input{tables/structural}
-\end{table}
-
-\Cref{tab:structural} compares readers. The axis-preserving reader improves on the shipped reader
-by $0.012$ on \dataset{LPMC} and $0.006$ on \dataset{Swissmetro}, both with intervals excluding
-zero, and it is the version whose factors can be inspected. Neither designed reader beats a
-two-layer network given the same axis slots. We therefore describe the architecture as buying
-interpretability rather than accuracy, and \Cref{tab:knockouts} locates what inside it matters.
-
-\begin{table}[t]
-\caption{Removing one component at a time, respondent-disjoint protocol, out-of-fold weight,
-three seeds. Positive means the removal hurts. Order within each block is Swissmetro, Optima,
-LPMC.}
-\label{tab:knockouts}
-\centering\small
-\input{tables/knockouts}
-\end{table}
-
-Only the low-rank projection survives inside the mixture. The personalised head weights are the
-largest loss when the channel is scored alone -- up to $0.100$ on \dataset{Optima} -- and have no
-measurable effect inside the deployed system. \Cref{sec:why-weights} explains that gap.
+The axis-preserving reader improves on the pooled reader by $0.012$ on \dataset{LPMC} and
+$0.006$ on \dataset{Swissmetro}, both with intervals excluding zero, and its factors can be
+inspected. Neither designed reader beats an ordinary two-layer network given the same axis
+slots. We therefore do not claim the architecture as a contribution. Removing one component at a time
+(\Cref{tab:knockouts}, \Cref{app:extra}) shows that only the low-rank projection survives inside
+the pool; the personalised weights, the attention, the auxiliary loss and the slot dropout each
+change the pooled score by less than $0.004$.
 
 \subsection{Protocol dependence}
 
 \begin{table}[t]
-\caption{\dataset{LPMC}, the only dataset whose ordering field is calendar time. The
-time-respecting split reverses the ranking.}
+\caption{\dataset{LPMC}, the only dataset whose ordering field is calendar time.}
 \label{tab:protocol}
 \centering\small
 \input{tables/protocol}
 \end{table}
 
 Under the respondent-disjoint split the generated text is the best channel; under the
-time-respecting split on the same data a shuffled control beats it and a text-free channel beats
-both. Both protocols are defensible questions -- predicting for a new person, and predicting a
-known person's next trip -- and they give opposite answers. A paper reporting only one of them
-reports half a result.
+time-respecting split on the same data a shuffled control beats it and a text-free channel
+beats both. Both are defensible questions, and they give opposite answers. A paper reporting
+one of them reports half a result.
