@@ -66,6 +66,7 @@ from experiments.harness.train import evaluate, fit, lbfgs_prefit, nll_on
 from experiments.models.boost import DEFAULT as BOOST_DEFAULT, RUM, _canon, all_logits, build_blocks, run_child
 from experiments.models.hetero import build_hetero_v1, make_builder as make_hetero_builder
 from experiments.models.ncat import ConceptBranch
+from experiments.models.orthogonal import ResidualMember, erased_view, probe_r2
 from experiments.models.pref import PrefBranch, V1 as PREF_V1, _log_mean_exp
 
 HETERO_V1 = dict(taste="generic", intercepts=True, person=True)        # hetero_v1's structural form
@@ -99,6 +100,8 @@ class Config:
     pi_boot: int = 100
     pi_l2: float = 1.0                  # ridge on w (per validation event) for the covariate gate
     slot_keep: Tuple[int, ...] = ()     # members see only these sentence slots (others zeroed); () = all K
+    erase: bool = False                 # erase [numeric attributes, alternative identity, Z] from E before the members
+    resid_nu: float = 0.0               # > 0: members trained with nu * cross-fitted structural log-probs as an offset
     member_kind: str = "pref"           # stage-3 member class (MEMBER_FACTORIES key); "pref" = PrefBranch V1
     member_kw: Tuple[Tuple[str, object], ...] = ()   # keyword overrides for the member class (ablations/)
 
@@ -111,7 +114,23 @@ class StructuralStage:
     info: Dict
 
 
+_ERASE_CACHE: Dict[Tuple[str, int, str], Tuple[Bundle, Dict]] = {}
 _STRUCT_CACHE: Dict[Tuple[str, int, int], StructuralStage] = {}
+
+
+def erased_stage(b: Bundle, seed: int, view: str) -> Tuple[Bundle, Dict]:
+    """Erased-E view of ``b`` (fitted on its own training rows) with the probe R2 before and after.
+
+    Every direction linearly predictable from the alternative's numeric attributes, its identity and
+    the person covariates is removed from each sentence embedding, so whatever the language channel
+    contributes afterwards cannot be a linear restatement of those inputs."""
+    key = (b.dataset, seed, view)
+    if key not in _ERASE_CACHE:
+        t0 = time.time()
+        eb = erased_view(b)
+        info = {"probe_before": probe_r2(b, b.E), "probe_after": probe_r2(b, eb.E), "seconds": time.time() - t0}
+        _ERASE_CACHE[key] = (eb, info)
+    return _ERASE_CACHE[key]
 _MEMBER_CACHE: Dict[Tuple[str, int, int], Tuple[List[PrefBranch], Dict]] = {}
 
 
@@ -354,12 +373,15 @@ def _pretrain_member(m: nn.Module, b: Bundle, seed: int):
 
 
 def semantic_members(b: Bundle, seed: int, members: int, shuffled: bool = False,
-                     view: str = "", kind: str = "pref", kw: Tuple[Tuple[str, object], ...] = ()) -> Tuple[List[nn.Module], Dict]:
-    key = (b.dataset, seed, members, shuffled, view, kind, kw)
+                     view: str = "", kind: str = "pref", kw: Tuple[Tuple[str, object], ...] = (),
+                     offset: Optional[torch.Tensor] = None, nu: float = 0.0) -> Tuple[List[nn.Module], Dict]:
+    key = (b.dataset, seed, members, shuffled, view, kind, kw, nu)
     if key in _MEMBER_CACHE:
         return _MEMBER_CACHE[key]
     torch.manual_seed(seed)
     mems = [MEMBER_FACTORIES[kind](b, **dict(kw)) for _ in range(members)]
+    if nu > 0:
+        mems = [ResidualMember(m, offset, nu) for m in mems]
     frs = [_pretrain_member(m, b, seed * 100 + i) for i, m in enumerate(mems)]
     ens = _SemEnsemble(mems)
     ev = evaluate(ens, b, "test")
@@ -563,16 +585,25 @@ def _build(b: Bundle, seed: int, cfg: Config, view_tag: str = ""):
         info["stage2"] = {"tau": tau, "trials": trials, "init_val_nll": float(F.cross_entropy(tau * logits[va], b.y[va])),
                           **best[3]}
         if cfg.members:
-            sb = shuffled_view(b, seed) if cfg.shuffle_sentences else b
+            sb = b
+            if cfg.erase:            # erase first, then shuffle: the control must not leak the numbers
+                sb, einfo = erased_stage(b, seed, view)
+                info["erase"] = {"probe_before": einfo["probe_before"], "probe_after": einfo["probe_after"]}
+            if cfg.shuffle_sentences:
+                sb = shuffled_view(sb, seed)
             if cfg.sentence_control:
                 sb = control_view(sb, cfg.sentence_control, seed)
             if cfg.slot_keep:
                 sb = slot_view(sb, cfg.slot_keep)
             mems, minfo = semantic_members(sb, seed, cfg.members, shuffled=cfg.shuffle_sentences,
-                                           view=view + cfg.sentence_control + (f"slots{cfg.slot_keep}" if cfg.slot_keep else ""),
-                                           kind=cfg.member_kind, kw=cfg.member_kw)
+                                           view=view + cfg.sentence_control
+                                                + (f"slots{cfg.slot_keep}" if cfg.slot_keep else "")
+                                                + ("erase" if cfg.erase else ""),
+                                           kind=cfg.member_kind, kw=cfg.member_kw,
+                                           offset=s1.offset if cfg.resid_nu > 0 else None, nu=cfg.resid_nu)
             model.members = nn.ModuleList(mems)
-            model.sem_view = sb if (cfg.shuffle_sentences or cfg.sentence_control or view or cfg.slot_keep) else None
+            model.sem_view = sb if (cfg.shuffle_sentences or cfg.sentence_control or view
+                                    or cfg.slot_keep or cfg.erase) else None
             info["stage3"] = minfo
         if cfg.pi_fit == "oof" and cfg.members:
             oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
@@ -651,3 +682,20 @@ build_llm_cold_gate_z_strong = make_builder(**FULL, **COLD, pi_input="Z", pi_l2=
 for _k, _name in enumerate(("financial", "time", "comfort", "convenience", "reliability")):
     globals()[f"build_llm_slot_{_name}"] = make_builder(**FULL, slot_keep=(_k,))
     globals()[f"build_llm_cold_slot_{_name}"] = make_builder(**FULL, **COLD, slot_keep=(_k,))
+
+# ---------------------------------------------------------------------------------------------
+# Identified outcome channel: the contribution is certified non-redundant with the observed
+# attributes (erasure), or trained against what the structural model already predicts (residual
+# offset), and the mixture weight is stacked out of fold rather than set by hand.  Each variant
+# ships with its own shuffled control, which shuffles the *already erased* embeddings so the
+# control cannot recover the numbers through the subtracted term.
+# ---------------------------------------------------------------------------------------------
+ID_COLD = dict(**FULL, **COLD, pi_fit="oof")
+build_id_erase = make_builder(**ID_COLD, erase=True)
+build_id_erase_shuffled = make_builder(**ID_COLD, erase=True, shuffle_sentences=True)
+build_id_resid = make_builder(**ID_COLD, resid_nu=0.3)
+build_id_resid_shuffled = make_builder(**ID_COLD, resid_nu=0.3, shuffle_sentences=True)
+build_id_erase_resid = make_builder(**ID_COLD, erase=True, resid_nu=0.3)
+build_id_erase_resid_shuffled = make_builder(**ID_COLD, erase=True, resid_nu=0.3, shuffle_sentences=True)
+build_id_plain = make_builder(**ID_COLD)
+build_id_plain_shuffled = make_builder(**ID_COLD, shuffle_sentences=True)
