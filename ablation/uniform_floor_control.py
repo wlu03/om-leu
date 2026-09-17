@@ -37,7 +37,7 @@ def run(dataset: str, seed: int = 7, protocol: str = "person", pi_fit: str = "va
     te = bb.idx("test"); y = bb.y[te].numpy(); n = np.arange(len(y))
     with torch.no_grad():
         pi = float(model.pi)
-        s = torch.softmax(float(model.log_a.exp()) * model.U[te], -1).double().numpy()
+        s = torch.softmax(float(model.a) * model.U[te], -1).double().numpy()
         q = _log_mean_exp(torch.stack([m(model.sem_view or bb, te) for m in model.members], 1), 1).exp().double().numpy()
         mix = model(bb, te).exp().double().numpy()
         b0 = getattr(m0, "data_view", None) or b

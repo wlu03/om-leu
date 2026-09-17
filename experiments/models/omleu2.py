@@ -106,6 +106,28 @@ class Config:
     member_kw: Tuple[Tuple[str, object], ...] = ()   # keyword overrides for the member class (ablations/)
 
 
+class _LogAClamp:
+    """Smooth bound on the inverse temperature: a = exp(lo + (hi-lo) * (tanh(x)+1)/2).
+
+    A hard clamp has zero gradient outside the range, which stalls L-BFGS; this keeps the
+    gradient finite everywhere while holding a in [e^lo, e^hi].  The range covers every
+    temperature the datasets here have needed (fitted values run from 0.7 to 1.3)."""
+
+    def __init__(self, lo: float = -4.0, hi: float = 4.0):
+        self.lo, self.hi = lo, hi
+
+    def tanh_scale(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.exp(self.lo + (self.hi - self.lo) * 0.5 * (torch.tanh(x) + 1.0))
+
+    def inverse(self, a: float) -> float:
+        import math
+        z = (math.log(a) - self.lo) / (self.hi - self.lo) * 2.0 - 1.0
+        return math.atanh(min(max(z, -0.999999), 0.999999))
+
+
+LOG_A_CLAMP = _LogAClamp()
+
+
 @dataclass
 class StructuralStage:
     model: nn.Module                    # fitted hetero_v1 ensemble (full-train fit)
@@ -424,7 +446,12 @@ class Omleu2(nn.Module):
 
     @property
     def pi(self) -> torch.Tensor:
-        return torch.sigmoid(self.gamma)
+        return torch.sigmoid(self.gamma.clamp(-30.0, 30.0))
+
+    @property
+    def a(self) -> torch.Tensor:
+        """Inverse temperature actually applied to the numeric utilities."""
+        return LOG_A_CLAMP.tanh_scale(self.log_a) if self.cfg.temp else torch.ones(())
 
     def unc_features(self, b: Bundle, idx: torch.Tensor) -> torch.Tensor:
         """[structural entropy, semantic entropy, member disagreement] per event, standardised on val."""
@@ -450,7 +477,7 @@ class Omleu2(nn.Module):
         return torch.sigmoid(self.gamma + feats @ self.w_pi)
 
     def forward(self, b: Bundle, idx: torch.Tensor) -> torch.Tensor:
-        a = self.log_a.exp() if self.cfg.temp else 1.0
+        a = self.a
         Lp = torch.log_softmax(a * self.U[idx], -1)
         if len(self.members) == 0:
             return Lp
@@ -537,10 +564,14 @@ def _fit_scalars_oof(model: "Omleu2", b: Bundle, seed: int, cfg: Config, view: s
     gamma.data.fill_(-6.0); log_a.data.zero_()
 
     def loss():
-        a = log_a.exp() if cfg.temp else 1.0
+        # Bound both scalars inside the objective.  Without this the line search can push
+        # log_a or gamma far enough that exp() or log() overflows on a channel whose
+        # log-probabilities are extreme (residual-trained members, or a very sharp
+        # structural channel), and the fit dies instead of converging.
+        a = LOG_A_CLAMP.tanh_scale(log_a) if cfg.temp else 1.0
         Lp = torch.log_softmax(a * L, -1)
-        pi = torch.sigmoid(gamma)
-        lp = torch.logaddexp(torch.log1p(-pi) + Lp, torch.log(pi) + S)
+        pi = torch.sigmoid(gamma.clamp(-30.0, 30.0))
+        lp = torch.logaddexp(torch.log1p(-pi + 1e-12) + Lp, torch.log(pi + 1e-12) + S)
         return F.cross_entropy(lp, y)
     scalars = [gamma] + ([log_a] if cfg.temp else [])
     nll = lbfgs_prefit(loss, scalars, max_iter=200)
@@ -611,7 +642,7 @@ def _build(b: Bundle, seed: int, cfg: Config, view_tag: str = ""):
             val_nll = nll_on(model, b, b.idx("val"))
         else:
             val_nll = model.stack_on_val(b)
-        extra = {**info, "cfg": dataclasses.asdict(cfg), "tau": tau, "pi": float(model.pi), "temp_a": float(model.log_a.exp()),
+        extra = {**info, "cfg": dataclasses.asdict(cfg), "tau": tau, "pi": float(model.pi), "temp_a": float(model.a),
                  "gate": float(model.pi)}
         if model.w_pi is not None:
             with torch.no_grad():

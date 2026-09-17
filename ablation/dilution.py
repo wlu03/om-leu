@@ -24,7 +24,7 @@ for name in ("full_model", "no_person_weights"):
     te = bb.idx("test")
     with torch.no_grad():
         q = _log_mean_exp(torch.stack([m(model.sem_view or bb, te) for m in model.members], 1), 1).exp().double().numpy()
-        s = torch.softmax(float(model.log_a.exp()) * model.U[te], -1).double().numpy()
+        s = torch.softmax(float(model.a) * model.U[te], -1).double().numpy()
         p = model(bb, te).exp().double().numpy()
     got[name] = dict(q=q, s=s, p=p, pi=float(model.pi), y=bb.y[te].numpy())
 y = got["full_model"]["y"]; n = np.arange(len(y))

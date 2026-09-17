@@ -27,7 +27,7 @@ for name in ("full_model", "no_person_weights", "global_weights"):
     te = bb.idx("test")
     with torch.no_grad():
         sem = _log_mean_exp(torch.stack([m(model.sem_view or bb, te) for m in model.members], 1), 1)
-        a = float(model.log_a.exp())
+        a = float(model.a)
         struct = torch.log_softmax(a * model.U[te], -1)
         mix = model(bb, te)
     y = bb.y[te]
