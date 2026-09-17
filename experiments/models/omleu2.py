@@ -601,9 +601,17 @@ def _build(b: Bundle, seed: int, cfg: Config, view_tag: str = ""):
             info["stage1c"] = ncat_info
         trials = {}
         best: Tuple[float, float, torch.Tensor, Dict] = (float("inf"), 0.0, torch.zeros(b.N, b.J), {})
-        tau_grid = (1.0,) if cfg.boost_off else cfg.tau_grid
+        # A per-alternative booster is undefined when alternatives come from a catalogue: every
+        # slot holds the same kind of object, so there is one canonical alternative and the
+        # slot-to-alternative map is not a bijection.  Disable stage 2 and record why, rather
+        # than silently scoring only the first slot.
+        boost_off = cfg.boost_off or b.n_alts == 1
+        if boost_off and not cfg.boost_off:
+            info["stage2_disabled"] = ("one canonical alternative: a per-alternative booster is not "
+                                       "defined for catalogue alternatives")
+        tau_grid = (1.0,) if boost_off else cfg.tau_grid
         for tau in tau_grid:
-            if cfg.boost_off:
+            if boost_off:
                 f, binfo = torch.zeros(b.N, b.J), {"best_val_nll": float(F.cross_entropy(logits[va], b.y[va])),
                                                    "best_round": 0, "n_trees": 0, "importance": {}}
             else:

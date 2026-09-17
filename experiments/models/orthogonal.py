@@ -104,12 +104,16 @@ def probe_r2(b: Bundle, E, alphas: Tuple[float, ...] = (1e-3, 1e-2, 1e-1, 1.0, 1
     """Ridge probe (fit on train rows, ridge strength chosen per target on val) of the concepts from
     the concatenated slot embeddings; returns R² on train and test per concept group."""
     X = b.xnum_std()
-    names = b.meta["alt_feature_names"]
-    t_i = next(i for i, n in enumerate(names) if n.startswith("time"))
-    c_i = next(i for i, n in enumerate(names) if n.startswith("cost"))
+    # Address the two sign-constrained attributes through the metadata rather than by name, and
+    # drop any concept with no variance on this dataset (a catalogue dataset has no alternative
+    # identity to probe, and may have no time attribute at all).
+    t_i, c_i = int(b.meta["time_idx"]), int(b.meta["cost_idx"])
     oh = b.alt_onehot()
     groups = {"time": X[:, :, t_i:t_i + 1], "cost": X[:, :, c_i:c_i + 1], "alt_onehot": oh,
               "Z": b.Z[:, None, :].expand(-1, b.J, -1)}
+    groups = {k: g for k, g in groups.items() if float(g.float().std()) > 1e-8}
+    if not groups:
+        return {"note": "no concept group has variance on this dataset"}
     Y_all = torch.cat(list(groups.values()), -1)                        # (N, J, T)
     sizes = [g.shape[-1] for g in groups.values()]
     idx = {s: b.idx(s) for s in ("train", "val", "test")}
@@ -131,7 +135,13 @@ def probe_r2(b: Bundle, E, alphas: Tuple[float, ...] = (1e-3, 1e-2, 1e-1, 1.0, 1
     best_val = torch.full((Y_all.shape[-1],), -float("inf"), dtype=torch.float64)
     res = {s: torch.zeros(Y_all.shape[-1], dtype=torch.float64) for s in ("train", "test")}
     acc = {"train": 0.0, "test": 0.0}
-    a0 = sum(sizes[:2]); a1 = a0 + sizes[2]
+    # slice of the alternative-identity block, when this dataset has one
+    keys = list(groups)
+    if "alt_onehot" in keys:
+        k = keys.index("alt_onehot")
+        a0 = sum(sizes[:k]); a1 = a0 + sizes[k]
+    else:
+        a0 = a1 = 0
     for al in alphas:
         Wp = torch.linalg.solve(G + al * scale * eye, XtY)
         pv = r2(Xc["val"] @ Wp, Yc["val"])
@@ -142,15 +152,16 @@ def probe_r2(b: Bundle, E, alphas: Tuple[float, ...] = (1e-3, 1e-2, 1e-1, 1.0, 1
         for s in ("train", "test"):
             P = Xc[s] @ Wp
             res[s] = torch.where(better, r2(P, Yc[s]), res[s])
-            if better[a0:a1].any():
+            if a1 > a0 and better[a0:a1].any():
                 acc[s] = float((P[:, a0:a1].argmax(1) == Yc[s][:, a0:a1].argmax(1)).double().mean())
     out = {}
     off = 0
     for (name, g), n in zip(groups.items(), sizes):
         out[name] = {s: float(res[s][off:off + n].mean()) for s in ("train", "test")}
         off += n
-    out["alt_onehot"]["acc_test"] = acc["test"]
-    out["alt_onehot"]["acc_train"] = acc["train"]
+    if "alt_onehot" in out:
+        out["alt_onehot"]["acc_test"] = acc["test"]
+        out["alt_onehot"]["acc_train"] = acc["train"]
     return out
 
 
