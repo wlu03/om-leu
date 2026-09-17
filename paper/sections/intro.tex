@@ -1,0 +1,64 @@
+\section{Introduction}
+
+A growing body of work replaces or augments the hand-specified attributes of a behavioural
+model with text produced by a language model: a short description of what each available
+option would mean for the individual facing the decision. The text is embedded by a frozen
+sentence encoder, read by a small learned network, and combined with a conventional model.
+Reported gains are real in the sense that the combined system scores better than the
+conventional model alone. What is usually left open is \emph{why}.
+
+Three explanations are compatible with the same measurement, and they have different
+consequences for what one should build next.
+
+\begin{enumerate}
+\item \textbf{Ensembling.} Combining two models that make partly independent errors improves
+      a proper score, whatever the second model reads. If this is the explanation, the text is
+      incidental and a second numeric model would do as well.
+\item \textbf{Information.} The text carries something the attributes do not -- a reading of
+      the situation, a consequence the tabulated columns do not encode. This is the claim the
+      literature usually makes.
+\item \textbf{Architecture.} The gain comes from how the text is read: axis-wise scoring,
+      attention over sentences, person-specific valuation. This is what most method sections
+      describe at length.
+\end{enumerate}
+
+We take an existing three-stage pipeline of this kind and measure all three quantities
+separately. The pipeline is not our contribution and we do not argue for it; it is a
+representative instance, and holding it fixed is what makes the comparisons clean. Every
+variant in this paper sees the same generated sentences, the same encoder, the same
+conventional model and the same ensembling budget. Only the named component changes.
+
+Our findings are largely corrective.
+
+\textbf{A matched channel with no text attracts more weight than the text.} The fitted
+mixture weight on the language channel is $0.21$--$0.40$ across datasets, but a
+parameter-matched numeric channel with no language input at all receives $0.37$--$0.52$
+(\Cref{tab:pi}). The mixture weight is a measure of wanting a second opinion, not of
+linguistic content, and should not be reported as evidence for the latter.
+
+\textbf{The reader architecture is not the source of the gain.} An ordinary two-layer network
+on the same embeddings matches the designed reader on all three travel datasets and beats it
+on two (\Cref{tab:structural}). Inside the designed reader, the component we had described as
+modelling individual taste -- person-specific weights over named attribute heads -- can be
+replaced by a constant with no measurable effect on the deployed system, and we give the
+measurement that explains why (\Cref{sec:why-weights}).
+
+\textbf{A control the field does not use overturns one positive result.} Shuffled sentences,
+identity-only text and random embeddings are all trained models producing non-uniform
+predictions; none of them isolates the fact that mixing \emph{anything} into a sharp model
+bounds its loss. Replacing the language channel by the uniform distribution at the same
+fitted weight is strictly stronger. Two of our four datasets pass the usual three controls
+and fail this one (\Cref{tab:floor}).
+
+\textbf{The effect is protocol-dependent.} On the single dataset whose ordering field is
+genuine calendar time, a time-respecting split reverses the ranking: the shuffled control
+beats the real text and a text-free channel beats both (\Cref{tab:protocol}). We also show
+that two of our three datasets cannot support a time-respecting protocol at all, because
+their apparent timestamps are a questionnaire task index and a date manufactured by a
+preparation script.
+
+Alongside these we report four proposals that did not work, each with the diagnostic that
+explains the failure rather than a bare number, and an audit of the generation inputs which
+found statistics derived from the respondent's own choices inside the prompt. All numbers in
+this paper are recomputed from per-event predictions saved for every run; the script that
+writes every table is released with the code.

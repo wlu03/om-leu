@@ -1,0 +1,13 @@
+\begin{tabular}{lccc}
+\toprule
+sentence reader & Swissmetro & Optima & LPMC \\
+\midrule
+shipped reader (attention, heads, person weights) & 0.587 & 0.442 & 0.490 \\
+axis-preserving reader (\S\ref{sec:axis}) & 0.580 & 0.450 & 0.478 \\
+\quad + anchor supervision & 0.581 & 0.449 & 0.478 \\
+two-layer network, mean-pooled sentences & 0.584 & 0.451 & 0.485 \\
+two-layer network, axis slots kept & 0.581 & 0.452 & 0.478 \\
+two-layer network, slots + covariates & 0.582 & 0.450 & 0.475 \\
+two-layer network, all inputs & 0.589 & 0.445 & 0.486 \\
+\bottomrule
+\end{tabular}

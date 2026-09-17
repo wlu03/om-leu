@@ -1,0 +1,84 @@
+\section{Evaluation protocol and controls}
+\label{sec:protocol}
+
+The protocol is where most of our disagreements with earlier numbers originate, so we state it
+in full.
+
+\subsection{Splits}
+
+\paragraph{Respondent-disjoint (primary).} Every event of a respondent, and of a household where
+the identifier encodes one, is assigned to a single partition. No respondent-specific effect is
+fitted for a held-out respondent; the fallback is the zero effect. This is the deployment
+question of predicting for a person never seen before.
+
+\paragraph{Time-respecting (secondary).} We first verify that the ordering field is calendar
+time. Of our three travel datasets only one passes: \dataset{LPMC} carries $3{,}371$ distinct
+timestamps over three years, \dataset{Swissmetro}'s ordering field is the presentation index of a
+stated-preference questionnaire, and \dataset{Optima}'s dates were manufactured by a preparation
+script and take four distinct values. We therefore report the time-respecting protocol on
+\dataset{LPMC} only, with forward-only blocks, and record the other two as unsupported with that
+reason rather than inventing timestamps.
+
+\paragraph{The split the earlier results used.} A chronological split \emph{within} respondents
+places the same people in training and test. We keep it as a named reproduction configuration,
+never as a primary result, and \Cref{tab:protocol} shows why it matters.
+
+\subsection{Nested calibration}
+
+The two scalars in \Cref{eq:mixture} are fitted by L-BFGS on predictions that neither channel
+trained on. We use five outer folds over the development partition; for each fold the entire
+pipeline -- both channels -- is rebuilt on the complement and predicts the held-out fold. The
+scalars are then fitted on the pooled out-of-fold predictions and the stages are refitted on the
+full development partition before the locked test partition is scored once. Folds hold out whole
+respondents when the test regime is respondent-disjoint and hold out events when it shares
+respondents, so the fold matches the regime the weight will be used in. The temperature is
+applied exactly once, which we enforce with a test, and the numeric-only baseline receives its
+own temperature fitted on the same held-out data with the same budget.
+
+Fitting the weight on a single validation split, as the original pipeline did, gives a weight
+that differs from the test-optimal value by up to $0.3$; out-of-fold fitting removes the largest
+of the resulting losses (\Cref{app:calibration}).
+
+\subsection{A hierarchy of controls}
+\label{sec:controls}
+
+Each control removes one explanation. In increasing strength:
+
+\begin{description}
+\item[Second numeric channel.] A parameter-budget-matched model with no text, mixed through the
+      same calibration. Isolates ensembling.
+\item[Shuffled consequences.] Sentences from a different event, matched on dataset, alternative
+      and axis, with donors drawn only from the fitting partition and never from the recipient
+      respondent. Isolates event-specific content from generic content.
+\item[Identity-only text.] A sentence naming the alternative and nothing else. Isolates
+      alternative identity.
+\item[Random embeddings.] Seeded unit vectors with the encoder's normalisation. Isolates the
+      embedding geometry.
+\item[Templated facts.] Deterministic sentences built from exactly the fields the generator is
+      allowed to see, for example \emph{``Recorded out-of-pocket cost for car: 1.18 CHF.''}
+      Isolates what the language adds beyond restating the recorded quantities.
+\item[Uniform floor.] The language channel replaced by the uniform distribution at the same
+      fitted $\pi$.
+\end{description}
+
+The last is the one we did not find in the literature and the one that changes a conclusion.
+Because $p_i(y) \geq (1-\pi)\, q_i(y)$ for the mixture in \Cref{eq:mixture},
+\begin{equation}
+-\log p_i(y) \;\leq\; -\log q_i(y) \;-\; \log(1-\pi),
+\label{eq:floor}
+\end{equation}
+so mixing in \emph{any} distribution bounds the loss on events where the conventional model is
+confidently wrong. At $\pi = 0.3$ that bound is $0.36$ nats per event, and it is available to a
+channel that predicts at chance. The first four controls are all trained models producing
+non-uniform predictions and so do not isolate this; the uniform floor does.
+
+\subsection{Metrics and intervals}
+
+The primary metric is mean per-event negative log-likelihood; Brier score, top-1 accuracy and a
+fifteen-bin top-label calibration error are also recorded. Differences are paired per event as
+$\mathrm{NLL}_{\text{baseline}} - \mathrm{NLL}_{\text{variant}}$, so positive favours the variant.
+Intervals are $2{,}000$-draw bootstraps resampling \emph{respondents} (households on
+\dataset{LPMC}) with all of a cluster's events moving together and the same resampled clusters
+across variants; they condition on the trained models and the observed split. Five prespecified
+contrasts form a Holm-corrected confirmatory family; the rest is exploratory, and an interval
+containing zero is never read as equivalence.

@@ -1,0 +1,34 @@
+\section{Discussion and conclusion}
+
+\paragraph{What we think the evidence supports.} Generated consequence text carries information
+beyond the recorded attributes on two of four datasets, and that information survives every
+control we could construct, including the uniform floor. It is not large: $0.02$--$0.03$ nats in
+the deployed system, against $0.01$--$0.02$ available to any second predictor. It is not
+architectural: an ordinary network reads the same embeddings as well as our designed readers do.
+And it is not robust to the evaluation question: on the one dataset where both protocols are
+legitimate, changing from ``a new person'' to ``this person's next trip'' reverses the ranking of
+the real text and a shuffled control.
+
+\paragraph{What it does not support.} No causal identification: the edited events in
+\Cref{sec:negative} carry no observed choice. No psychological identification: the attribute heads
+are named, not identified, and the mixture weight is a fitted scalar. No equivalence from intervals
+containing zero, and no monotonicity for the complete pipeline.
+
+\paragraph{Recommendations for reporting.} Three would have changed our own earlier conclusions:
+report the mixture weight next to the weight a text-free channel attracts, since the latter is
+usually larger; include a uniform-floor control, since the usual controls are themselves trained
+models and miss the bound in \Cref{eq:floor}; and state which split a number comes from, since on
+our data the two defensible splits disagree in direction, not magnitude.
+
+\paragraph{Limitations.} The travel datasets are public case studies with a few hundred to a
+thousand respondents, and the intervals condition on the observed split. The \dataset{Amazon} run
+uses a smaller generator on a hundred-respondent fixture, so it establishes the floor effect in a
+second domain but nothing quantitative across domains. Two arms are incomplete: the
+grounded-generation comparison is blocked on generation budget, and an extension representing
+outcomes as distributions is implemented and tested on synthetic fixtures but has no empirical
+arm, since no dataset records repeated journeys, scenario probabilities or elicited beliefs.
+
+Separating ensembling, content and architecture, and adding a control that isolates the
+arithmetic of mixing, leaves a smaller and more conditional claim than the usual one: real content
+on some datasets, none on others, no architectural advantage, and a direction that depends on
+which prediction question is asked. The controls and the protocol are cheap to adopt.

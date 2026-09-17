@@ -1,0 +1,65 @@
+\section{The system under test}
+\label{sec:method}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/architecture}
+\caption{The pipeline held fixed throughout. Stages 1 and 2 form the conventional channel; stage 3
+is the language channel. The two channels meet only through the scalars $\pi$ and $a$, so setting
+$\pi=0$ recovers the conventional model exactly and the language contribution is measurable
+without retraining anything else.}
+\label{fig:architecture}
+\end{figure}
+
+We hold a three-stage pipeline fixed and vary one component at a time. The pipeline predicts
+which alternative $j$ a person $i$ chooses from an available set, given tabulated attributes
+$x_{ij}$, person covariates $z_i$, admissible history $h_{ij}$, and $K$ generated sentences per
+alternative.
+
+\paragraph{Stage 1: structural utility.} A random-utility model with covariate-dependent
+coefficients,
+\begin{equation}
+V_{ij} = \mathrm{ASC}_j + \beta^{\top} x_{ij} - \beta_t(z_i)\, t_{ij} - \beta_c(z_i)\, c_{ij}
+         + g_j(z_i) + u_{p(i)j},
+\end{equation}
+where $\beta_t,\beta_c > 0$ are produced by a small network through a softplus, $g_j$ is a
+zero-initialised network of the covariates, and $u_{pj}$ is an $L_2$-penalised person effect.
+The sign restriction on time and cost is a modelling assumption about tastes, not a requirement
+of random utility. Five fits from different initialisations are averaged at the probability
+level, giving $L_{ij} = \log \frac{1}{R}\sum_r \mathrm{softmax}_j(V^{(r)}_i)$.
+
+\paragraph{Stage 2: shape-constrained residual.} One gradient-boosted ensemble per alternative
+reads that alternative's own attributes, the covariates and the history, and is trained under
+the choice-set softmax with $\tau L_{ij}$ as an offset:
+$U_{ij} = \tau L_{ij} + f_j(x_{ij}, z_i, h_{ij})$. Time and cost carry monotone constraints
+inside $f_j$. The offset is cross-fitted on inner folds so that the residual does not correct a
+model that has already seen the same rows. We note that a constraint inside one component does
+not make the final mixture monotone in an attribute; \Cref{sec:gate} gives the missing term.
+
+\paragraph{Stage 3: the language channel.} A frozen language model writes $K=5$ first-person
+sentences per (person, alternative), one per axis -- financial, time, comfort, convenience,
+reliability -- from the attributes, covariates and admissible history. A frozen sentence encoder
+maps each to $\mathbb{R}^{768}$. One member of the reader projects to $r=32$ dimensions with a
+layer norm, pools the $K$ sentences by content-based attention, reads $M=5$ linear heads from the
+pooled vector, and combines them with weights $w(z_i)$ on the simplex:
+$\tilde V_{ij} = \sum_m w_m(z_i) A_{ijm}$. Five members with different seeds are averaged in
+probability to give $\bar p_i(j)$.
+
+\paragraph{Combination.} The channels meet at the probability level,
+\begin{equation}
+p_i(j) = (1-\pi)\,\mathrm{softmax}_j(a\,U_i) + \pi\, \bar p_i(j),
+\label{eq:mixture}
+\end{equation}
+with $\pi = \sigma(\gamma)$ and inverse temperature $a$. These two scalars are the \emph{only}
+parameters that couple the channels, which is what makes the language contribution exactly
+measurable: setting $\pi = 0$ recovers the conventional model. Everything else is frozen before
+they are estimated.
+
+\label{sec:axis}
+\paragraph{An axis-preserving reader.} We also evaluate a variant that scores each axis before
+any pooling: $c_{ijk} = g_k(\mathrm{LN}(W e_{ijk}))$ with head $k$ reading only sentence slot
+$k$, then $u_{ij} = s_i \sum_k w_k(z_i)\, c_{ijk}$. We verify by construction that a
+perturbation of one axis score changes the utility only through its own weighted term, and that
+the model is equivariant to permuting alternatives (\Cref{app:tests}). This variant is
+interpretable in a way the pooled reader is not; \Cref{sec:results} reports what it costs or
+buys.

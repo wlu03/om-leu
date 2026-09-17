@@ -1,0 +1,16 @@
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{3}{c}{channel alone} & \multicolumn{3}{c}{inside the mixture} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+component removed & Swis & Opti & LPMCSwis & Opti & LPMC \\
+\midrule
+personalised head weights & -0.007 & -0.100 & -0.025 & +0.001 & -0.000 & +0.003 \\
+\quad learned but shared weights & -0.007 & -0.100 & -0.025 & +0.001 & -0.000 & +0.003 \\
+five attribute heads & -0.007 & -0.089 & -0.021 & +0.001 & +0.001 & +0.002 \\
+salience attention & +0.004 & -0.015 & +0.002 & +0.001 & -0.003 & -0.001 \\
+low-rank projection & -0.026 & +0.005 & -0.039 & -0.005 & +0.001 & -0.012 \\
+auxiliary probe loss & -0.002 & +0.005 & -0.008 & -0.001 & +0.001 & -0.003 \\
+sentence-slot dropout & +0.002 & -0.016 & -0.006 & +0.001 & -0.001 & -0.000 \\
+five-member ensemble & -0.007 & -0.002 & -0.016 & +0.000 & +0.004 & -0.002 \\
+\bottomrule
+\end{tabular}

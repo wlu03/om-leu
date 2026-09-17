@@ -1,0 +1,120 @@
+\section{Further tables}
+\label{app:extra}
+
+\begin{table}[h]
+\caption{Fitted mixture weight $\pi$ by channel, respondent-disjoint protocol. A channel with no
+text at all attracts the largest weight on every dataset.}
+\label{tab:pi}
+\centering\small
+\input{tables/pi}
+\end{table}
+
+\begin{table}[h]
+\caption{Four proposed improvements against their own controls, \dataset{LPMC},
+respondent-disjoint protocol.}
+\label{tab:improvements}
+\centering\small
+\input{tables/improvements}
+\end{table}
+
+\paragraph{Transfer and learning curves.}
+
+\begin{table}[t]
+\caption{Transfer of the axis scorer between datasets (seed 7). The projection and per-axis heads
+transfer and are frozen; valuation and calibration are refitted on the target.}
+\label{tab:transfer}
+\centering\small
+\input{tables/transfer}
+\end{table}
+
+\begin{table}[t]
+\caption{Learning curves on \dataset{LPMC} (seed 7), subsampling whole households.}
+\label{tab:curve}
+\centering\small
+\input{tables/curve}
+\end{table}
+
+A frozen source-trained scorer is worse than fitting on the target in all six directions
+(\Cref{tab:transfer}); fine-tuning recovers most of the difference, which says the transferred
+parameters are a reasonable initialisation rather than a transferable notion of outcome level.
+The learning curves (\Cref{tab:curve}) show templated facts leading generated text at every
+training size, with the gap narrowing as data grows.
+
+\section{Audit of the generation inputs}
+\label{sec:audit}
+
+Before running anything we audited what the generator is shown and what it writes.
+
+\paragraph{Label-derived statistics reach the prompt.} The person profile supplied to the
+generator is rendered from a per-respondent row containing a count of that respondent's events
+and the mean of a per-event novelty indicator. Both are aggregates over \emph{all} of that
+respondent's events, including their validation and test events, and the second is a function of
+the chosen alternative. The rendered phrases are coarse, so the channel is weak, but it is
+label-derived and future-derived; our grounded allowlist rejects both fields programmatically.
+
+\paragraph{Unsupported claims in the generated sentences.} A mechanical scan of $120$ events per
+dataset counts sentences matching claim types the supplied evidence cannot establish -- calling a
+price negligible, asserting parking availability, stating a preference rather than an outcome --
+and numerals that match no supplied quantity under a declared unit conversion.
+
+\begin{center}\small
+\begin{tabular}{lccc}
+\toprule
+dataset & sentences & with a flagged claim & numerals matching no supplied quantity \\
+\midrule
+Optima & 1{,}800 & 18.9\% & 29.4\% \\
+LPMC & 2{,}400 & 11.9\% & 38.8\% \\
+Swissmetro & 1{,}800 & 26.3\% & 14.9\% \\
+Amazon & 4{,}500 & 2.4\% & -- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The claim scan is a lower bound, since it only catches the patterns it knows; the numeral check
+is an upper bound, since a correctly derived total counts as unsupported. Whether a sentence is a
+fair reading of the evidence is not mechanically checkable and remains unverified: we release a
+label-blind annotation export with fields for support, factual correctness, preference
+contamination and ambiguity, and note that no annotator has scored it.
+
+\paragraph{Other audit findings.} Attribute standardisation in the released pipeline was fitted on
+a training split that is not the training partition of a respondent-disjoint fold; we
+re-standardise inside each fitting partition, which is exact because standardisation is affine.
+The generation cache is keyed by a composite that folds hashes of the person text and the rendered
+alternative into the version string, which we verified empirically: no two events of a respondent
+share an embedding for the same alternative. Admissible history uses strictly prior counts. No
+dataset carries an availability mask, so all alternatives are treated as available, which is an
+assumption inherited from the source case studies rather than a property of the data.
+
+\section{Calibration details}
+\label{app:calibration}
+
+The two scalars are fitted by L-BFGS with a strong Wolfe line search in double precision,
+initialised at $\gamma = -6$ so that the model starts as the conventional model alone. Every fit
+is checked at both boundaries ($\pi = 0$ and $\pi = 1$) for finiteness and against a
+$21 \times 21$ grid over $(\pi, \log a)$; the grid never found a better optimum than L-BFGS in any
+reported run. Fitting on a single validation split rather than out of fold moves the fitted weight
+by up to $0.3$ and costs $0.010$ nats on \dataset{Optima}. On \dataset{Amazon} the conventional
+channel becomes extremely sharp -- fitted inverse temperature $153$ -- and sixteen out-of-fold
+fits overflowed; those are recorded as failures rather than dropped.
+
+\section{Tests}
+\label{app:tests}
+
+Fifty acceptance tests accompany the code. They cover: rejection of label-derived fields in a
+generation input; respondent and household disjointness, and disjointness of development folds;
+forward-only temporal blocks and rejection of a task index or a manufactured date as calendar
+time; a single application of the temperature; finite loss at both mixture boundaries; masked
+probabilities summing to one with zero mass on unavailable alternatives; locality of each axis
+score to its own sentence slot and the identity $\mathrm{d}u = s\,w_k\,\mathrm{d}c_k$; equivariance
+to permuting alternatives; claim preservation of paraphrases (quantities, negation polarity,
+evidence status); the mixture gradient identity against autograd and the complementarity
+derivative against a finite difference; positive semi-definiteness of the covariance in the
+distributional extension and its exact reduction at zero risk aversion; frozen-parameter checks in
+transfer; and the monotonicity decomposition of \Cref{sec:gate}.
+
+Four defects were found and fixed during the study, each with a regression test: a covariate
+re-standardisation that divided by a near-zero deviation and silently made one dataset's
+conventional channel uniform; a reporting path that averaged archived runs into current tables;
+transfer variants that all ran with a single dataset as target and were therefore self-transfers;
+and a crash in the report writer. We mention them because each was caught by a control or a test
+rather than by inspection of the numbers.

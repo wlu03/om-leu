@@ -1,0 +1,50 @@
+[
+ {
+  "dataset": "swissmetro",
+  "protocol": "person",
+  "pi": 0.00247398903593421,
+  "chance": 1.0986122886681098,
+  "numeric_only": 0.6702903360845182,
+  "sentences_alone": 0.730581228349574,
+  "mixture": 0.6699428092350687,
+  "uniform_floor_same_pi": 0.669437710850677,
+  "sentences_beyond_the_floor": -0.0005050983843916113,
+  "total_mixture_gain": 0.00034752684944949763
+ },
+ {
+  "dataset": "optima",
+  "protocol": "person",
+  "pi": 0.4076758921146393,
+  "chance": 1.0986122886681098,
+  "numeric_only": 0.3687905949843328,
+  "sentences_alone": 0.48214699922899873,
+  "mixture": 0.38657910874795093,
+  "uniform_floor_same_pi": 0.5653574668462732,
+  "sentences_beyond_the_floor": 0.17877835809832227,
+  "total_mixture_gain": -0.01778851376361812
+ },
+ {
+  "dataset": "lpmc",
+  "protocol": "person",
+  "pi": 0.2537328004837036,
+  "chance": 1.3862943611198906,
+  "numeric_only": 0.47689660989316657,
+  "sentences_alone": 0.5261950369300196,
+  "mixture": 0.44963387867368826,
+  "uniform_floor_same_pi": 0.5820996556867596,
+  "sentences_beyond_the_floor": 0.13246577701307133,
+  "total_mixture_gain": 0.02726273121947831
+ },
+ {
+  "dataset": "amazon",
+  "protocol": "person",
+  "pi": 0.3441733717918396,
+  "chance": 1.6094379124341003,
+  "numeric_only": 1.5580914621069006,
+  "sentences_alone": 1.593314158421368,
+  "mixture": 1.4437459498981087,
+  "uniform_floor_same_pi": 1.4614182140857066,
+  "sentences_beyond_the_floor": 0.01767226418759793,
+  "total_mixture_gain": 0.11434551220879197
+ }
+]

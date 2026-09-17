@@ -1,0 +1,26 @@
+\section{Related work}
+
+\paragraph{Discrete choice models.} The conditional logit \citep{mcfadden1974} remains the
+reference model, with the mixed logit \citep{mcfadden2000mixed} relaxing its independence
+assumption. Recent work replaces parts of the utility with learned functions while keeping the
+random-utility form: taste parameters as functions of covariates \citep{han2022tastenet},
+alternative-specific architectures \citep{wang2020deep}, a learned term added to a specified
+utility \citep{sifringer2020enhancing}, and one boosted ensemble per alternative under a shared
+softmax \citep{salvade2024rumboost}. \citet{hillel2021systematic} benchmark these against
+unconstrained classifiers and document how sensitive the ranking is to the split, which is the
+sensitivity our protocol section addresses.
+
+\paragraph{Language models as feature generators.} A separate line uses language models either as
+direct predictors of behaviour \citep{brand2023using,horton2023large} or as generators of text
+that a downstream model reads; the pipeline we study belongs to the second family. Our concern is
+not whether such features help but what the reported help consists of, which places this work
+closer to the literature on controls and leakage \citep{kapoor2023leakage} than to the modelling
+literature.
+
+\paragraph{Combining and calibrating.} Mixing predictive distributions is standard
+\citep{wolpert1992stacked}, and stacking on out-of-fold predictions has known guarantees
+\citep{vanderlaan2007super,yao2018using}. A linear pool is usually no worse than its components in
+expectation, which is exactly why a mixture gain is weak evidence about the added component -- the
+observation our uniform-floor control formalises. Temperature scaling
+\citep{guo2017calibration} is the correction we apply to the conventional channel, fitted with the
+same budget as the mixture weight so the baseline is not handicapped.
