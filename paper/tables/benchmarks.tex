@@ -1,0 +1,18 @@
+\begin{tabular}{lccc}
+\toprule
+specification & Swissmetro & Optima & LPMC \\
+\midrule
+Multinomial logit & 0.841 & 0.456 & 0.507 \\
+Nested logit & 0.836 & 0.458 & 0.504 \\
+Mixed logit & 0.850 & 0.457 & 0.521 \\
+ICLV hybrid choice & -- & 0.439 & -- \\
+L-MNL \citep{sifringer2020enhancing} & 0.739 & 0.517 & 0.653 \\
+ASU-DNN \citep{wang2020deep} & 0.676 & 0.509 & 0.514 \\
+TasteNet-MNL \citep{han2022tastenet} & 0.704 & 0.505 & 0.527 \\
+RUMBoost \citep{salvade2024rumboost} & 0.633 & 0.476 & 0.533 \\
+Gradient boosting \citep{hillel2021systematic} & 0.574 & 0.428 & 0.507 \\
+\midrule
+proposed, attribute channel only & 0.617 & 0.402 & 0.499 \\
+proposed, with the language channel & 0.609 & 0.400 & 0.471 \\
+\bottomrule
+\end{tabular}

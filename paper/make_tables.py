@@ -243,6 +243,46 @@ def table_pi():
     write("pi.tex", "\n".join(L))
 
 
+def table_benchmarks():
+    """Nine reference specifications under the paper's own protocol, with matched features."""
+    import glob as _g
+    import numpy as _np
+    LABEL = {"mnl": "Multinomial logit", "nested_logit": "Nested logit", "mixed_logit": "Mixed logit",
+             "iclv_hybrid_choice": "ICLV hybrid choice", "l_mnl": "L-MNL \\citep{sifringer2020enhancing}",
+             "asu_dnn": "ASU-DNN \\citep{wang2020deep}",
+             "tastenet_mnl": "TasteNet-MNL \\citep{han2022tastenet}",
+             "rumboost": "RUMBoost \\citep{salvade2024rumboost}",
+             "gbdt_full_features": "Gradient boosting \\citep{hillel2021systematic}"}
+    R = {}
+    for f in _g.glob(str(ROOT / "methods/results_person_hist/*/*/seed_*.json")):
+        d = json.load(open(f))
+        if "nll" not in d:
+            continue
+        parts = Path(f).parts
+        R.setdefault(parts[-3], {}).setdefault(parts[-2], []).append(d["nll"])
+    if not R:
+        return
+    order = ["mnl", "nested_logit", "mixed_logit", "iclv_hybrid_choice", "l_mnl", "asu_dnn",
+             "tastenet_mnl", "rumboost", "gbdt_full_features"]
+    L = ["\\begin{tabular}{lccc}", "\\toprule",
+         "specification & " + " & ".join(PRETTY[d] for d in DS3) + " \\\\", "\\midrule"]
+    for m in order:
+        cells = []
+        for d in DS3:
+            v = R.get(d, {}).get(m)
+            cells.append(f"{_np.mean(v):.3f}" if v else "--")
+        if set(cells) == {"--"}:
+            continue
+        L.append(f"{LABEL[m]} & " + " & ".join(cells) + " \\\\")
+    L.append("\\midrule")
+    for label, v in (("proposed, attribute channel only", "no_sentences"),
+                     ("proposed, with the language channel", "full_model")):
+        cells = [fmt(ab(d, "person", "oof", v), 3) for d in DS3]
+        L.append(f"{label} & " + " & ".join(cells) + " \\\\")
+    L += ["\\bottomrule", "\\end{tabular}"]
+    write("benchmarks.tex", "\n".join(L))
+
+
 def table_identification():
     """Each identified-channel variant against its OWN shuffled control."""
     import subprocess
@@ -341,5 +381,5 @@ if __name__ == "__main__":
     print(f"artifact root: {AR}")
     for fn in (table_main, table_structural, table_knockouts, table_protocol,
                table_improvements, table_transfer, table_curve, table_pi, table_floor,
-               table_identification):
+               table_identification, table_benchmarks):
         fn()

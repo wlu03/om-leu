@@ -8,16 +8,28 @@ last because its alternatives are catalogue products. Travel text comes from a f
 model and \dataset{Amazon} text from a local $8$B model, so its absolute numbers are not
 comparable across domains while its internal contrasts are. Three seeds per travel dataset.
 
-\subsection{Combination, restatement, content}
+\subsection{Fit against reference specifications}
 
 \begin{table}[t]
-\caption{Test negative log-likelihood, respondent-disjoint protocol, weight fitted out of fold,
-mean over seeds. Each row adds one channel to the same attribute model; controls are defined
-in \Cref{sec:controls}.}
-\label{tab:main}
+\caption{Test negative log-likelihood, respondent-disjoint partitions, three seeds. Every
+specification is fitted on identical partitions with the same attributes, the same person
+covariates and the same two history variables; the ICLV model is estimated only where
+attitudinal indicators exist.}
+\label{tab:benchmarks}
 \centering\small
-\input{tables/main}
+\input{tables/benchmarks}
 \end{table}
+
+\Cref{tab:benchmarks} places the specification among nine references: lowest log-loss on
+\dataset{Optima} and \dataset{LPMC}, by $0.028$ and $0.034$ nats over the best reference, and
+beaten on \dataset{Swissmetro} by gradient boosting ($0.574$ against $0.609$). Two features
+matter more than the ranking. The attribute channel alone attains most of it, so the language
+channel accounts for $0.008$, $-0.001$ and $0.028$ nats of the three totals. And under the
+chronological within-person split this literature more commonly uses, the same comparison puts
+the proposed specification ahead on all three datasets; the ranking is a property of the
+protocol as much as of the models (\Cref{sec:protocol}).
+
+\subsection{Combination, restatement, content}
 
 A second channel with no text is worth $0.011$ on \dataset{LPMC} and $0.019$ on
 \dataset{Optima}: combination alone accounts for a third to all of what is usually attributed
@@ -32,20 +44,12 @@ for every channel are in \Cref{tab:pi}.
 
 \subsection{The weight-matched uninformative control}
 
-\begin{table}[t]
-\caption{Replacing the text channel by the uniform distribution at the same fitted $\pi$. On
-\dataset{Swissmetro} and \dataset{Amazon} the gain survives the shuffled, identity and random
-controls but not this one.}
-\label{tab:floor}
-\centering\small
-\input{tables/floor}
-\end{table}
-
-On \dataset{LPMC} and \dataset{Optima} the text channel is worth $0.13$ and $0.18$ nats more
-than a uniform distribution at the same weight. On \dataset{Swissmetro} it is worth $-0.001$,
-and on \dataset{Amazon}, where the channel predicts at chance ($1.593$ against $1.609$), it is
-worth $0.018$ of a total gain of $0.114$. In those two cases the gain is the bound of
-\Cref{eq:floor}.
+Replacing the text channel by the uniform distribution at the same fitted $\pi$
+(\Cref{tab:floor}, \Cref{app:extra}) leaves \dataset{LPMC} and \dataset{Optima} worse by $0.13$
+and $0.18$ nats, so there the weight is buying content. On \dataset{Swissmetro} the difference
+is $-0.001$ and on \dataset{Amazon}, where the channel predicts at chance ($1.593$ against
+$1.609$), it is $0.018$ of a total gain of $0.114$: in those two the pooled gain is the bound
+of \Cref{eq:floor}.
 
 \subsection{Identification}
 

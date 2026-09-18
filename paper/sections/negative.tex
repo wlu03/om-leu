@@ -7,10 +7,10 @@ report them because the diagnoses are testable and the failures are informative.
 
 \paragraph{Grounded generation.} A prompt that tags every sentence as observed, derived or
 unknown and forbids invented quantities, affordability judgements and demographic inferences,
-with programmatic validators for schema, evidence vocabulary and numeral support. Running it at
-scale needs a generation budget we did not have, so the comparison is recorded as blocked rather
-than as a negative result. What we can report is that templated facts predict better than the
-generated text whenever the channel is scored alone.
+with validators for schema, evidence vocabulary and numeral support. Running it at scale needs a
+generation budget we did not have, so it is recorded as blocked rather than as a negative
+result; what we can report is that templated facts predict better than generated text whenever
+the channel is scored alone.
 
 \paragraph{Consistency training.} If the representation tracks outcome magnitudes rather than
 wording, raising a fare should lower the financial score and leave the time score alone, and a

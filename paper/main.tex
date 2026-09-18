@@ -24,33 +24,35 @@
 \maketitle
 
 \begin{abstract}
-Discrete choice models are increasingly augmented with text that a language model writes
-about what each alternative would mean for the individual facing the decision, on the
-premise that the text supplies perceptual content the tabulated attributes omit. The
-standard evidence for that premise is an improvement in held-out log-likelihood. We show
-that this evidence is insufficient in three separate ways, and supply the procedure that
-replaces it. First, a parameter-matched channel containing no text attracts a
-\emph{larger} fitted mixture weight than the text channel does, so weight is not content.
-Second, mixing any distribution into a sharp model bounds its log loss, and on two of our
-four datasets that bound accounts for the entire apparent gain; we introduce a
-weight-matched uninformative-channel control that isolates it, and show it is strictly
-stronger than the shuffled, identity-text and random-embedding controls in use. Third, a
-deterministic template built from exactly the recorded attributes predicts at least as
-well as the generated text whenever the text channel is scored alone. We then give the
-positive procedure: erase from the text representation every direction linearly
-predictable from the alternative's attributes, its identity and the person covariates, so
-that any surviving contribution cannot be a linear restatement of what the generator was
-shown, and stack the mixture weight out of fold rather than setting it by hand. Under
-respondent-disjoint evaluation an identified contribution survives on three of four
-datasets -- $0.017$ nats on London travel choices, $0.009$ on Swiss stated-preference
-tasks, $0.042$ on retail purchases -- and is indistinguishable from zero on Swiss reported
-trips. What erasure costs varies sharply and is itself informative: it removes $43\%$ of
-the London gain, none of the Swiss stated-preference gain, and \emph{improves} the retail
-channel, which is what one expects where the generated text is largely restating a price
-the attribute channel already has. Four proposed improvements to the text channel produce no
-gain, and we give the diagnostics that explain each failure. We conclude that a claim that
-generated text carries information beyond the attributes it was generated from requires
-this procedure rather than a likelihood comparison.
+Choice models are increasingly augmented with text that a language model writes about what
+each alternative would mean for the individual facing the decision, on the premise that the
+text supplies perceptual content the tabulated attributes omit. We specify this as a
+random-utility model in which utility is composed over a generated consequence basis, and
+estimate it on four choice datasets against nine reference specifications -- multinomial,
+nested and mixed logit, an integrated choice and latent variable model, and five learned
+utility specifications -- all fitted on identical respondent-disjoint partitions with the
+same attributes and the same two history variables. The proposed specification attains the
+lowest test log-loss on two of the three travel datasets, improving on the best reference by
+$0.034$ nats on London trips and $0.028$ on Swiss reported trips, and is beaten by gradient
+boosting by $0.034$ nats on Swiss stated-preference tasks.
+
+Improvement in fit, however, does not establish that the text carries perceptual content, and
+our central contribution is the procedure that does. We show three ways the usual evidence
+fails: a parameter-matched channel containing no text attracts a \emph{larger} fitted mixture
+weight than the text channel; mixing any distribution into a sharp model bounds its log loss,
+which on two datasets accounts for the entire apparent gain; and a deterministic template
+built from exactly the recorded attributes predicts at least as well as the generated text
+whenever that channel is scored alone. We then erase from the text representation every
+direction linearly predictable from the alternative's attributes, its identity and the person
+covariates, so that any surviving contribution cannot be a linear restatement of what the
+generator was shown. A contribution survives on three of four datasets -- $0.017$ nats on
+London trips, $0.009$ on Swiss stated-preference tasks, $0.042$ on retail purchases -- and not
+on Swiss reported trips. What erasure costs differs sharply and is itself informative: it
+removes $43\%$ of the London gain, none of the Swiss stated-preference gain, and
+\emph{improves} the retail channel, where the generated text is largely restating a price the
+attribute channel already has. We conclude that a claim that generated text carries
+information beyond the attributes it was generated from requires this procedure rather than a
+likelihood comparison, and we report what remains once it is applied.
 \end{abstract}
 
 \input{sections/intro}

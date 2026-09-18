@@ -34,16 +34,18 @@ clean. Every variant sees the same text, encoder, base model and ensembling budg
 
 \paragraph{Findings.}
 \begin{itemize}
-\item The fitted mixture weight is not a measure of content. The text channel receives
-      $\pi = 0.21$--$0.40$ across datasets; a parameter-matched channel containing \emph{no}
-      text receives $0.37$--$0.52$ (\Cref{tab:pi}).
+\item The specification attains the lowest log-loss among nine references on two of three
+      travel datasets and is beaten by gradient boosting on the third
+      (\Cref{tab:benchmarks}); the language channel accounts for at most $0.028$ nats of that.
+\item The fitted mixture weight is not a measure of content: the text channel receives
+      $\pi = 0.21$--$0.40$, a parameter-matched channel with \emph{no} text receives
+      $0.37$--$0.52$ (\Cref{tab:pi}).
 \item A weight-matched uninformative-channel control separates the bound above from
-      information. On two of four datasets the entire apparent gain is the bound
-      (\Cref{tab:floor}), and this is invisible to the shuffled, identity-text and
-      random-embedding controls in use, because each of those is itself a trained model
-      producing a non-uniform distribution.
-\item A deterministic template containing exactly the recorded quantities predicts at least
-      as well as the generated text whenever the channel is scored alone (\Cref{tab:main}).
+      information: on two of four datasets the entire apparent gain is the bound, and this is
+      invisible to the shuffled, identity-text and random-embedding controls in use, each of
+      which is itself a trained model producing a non-uniform distribution.
+\item A deterministic template of the recorded quantities predicts at least as well as the
+      generated text whenever the channel is scored alone (\Cref{tab:main}).
 \item After erasing from the text representation every direction linearly predictable from
       the alternative's attributes, its identity and the person covariates, a contribution
       survives on three of four datasets and not on the fourth

@@ -2,6 +2,25 @@
 \label{app:extra}
 
 \begin{table}[h]
+\caption{Test negative log-likelihood, respondent-disjoint protocol, weight fitted out of fold,
+mean over seeds. Each row adds one channel to the same attribute model; controls are defined
+in \Cref{sec:controls}.}
+\label{tab:main}
+\centering\small
+\input{tables/main}
+\end{table}
+
+
+\begin{table}[h]
+\caption{Replacing the text channel by the uniform distribution at the same fitted $\pi$. On
+\dataset{Swissmetro} and \dataset{Amazon} the gain survives the shuffled, identity and random
+controls but not this one.}
+\label{tab:floor}
+\centering\small
+\input{tables/floor}
+\end{table}
+
+\begin{table}[h]
 \caption{\dataset{LPMC}, the only dataset whose ordering field is calendar time.}
 \label{tab:protocol}
 \centering\small
