@@ -37,8 +37,7 @@ tmp/
 runs/
 experiments/data/
 
-# ablation/: per-run JSON (per-event NLL lists) stay local; results.md + README.md are tracked
-ablation/*/results/*.json
+# ablation/: per-run JSON results are tracked (per-event NLL, needed for the paired intervals)
 
 # paper source is tracked; build products are not
 !paper/
