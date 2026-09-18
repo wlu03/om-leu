@@ -49,3 +49,6 @@ paper/*.log
 paper/*.bbl
 paper/*.blg
 paper/*.out
+
+# experiment package byte-code
+omleu_experiments/**/__pycache__/
