@@ -1,0 +1,273 @@
+{
+ "sentences": 1800,
+ "sentences_with_a_flag": 341,
+ "flagged_rate": 0.18944444444444444,
+ "numerals": 720,
+ "unsupported_numerals": 212,
+ "unsupported_numeral_rate": 0.29444444444444445,
+ "claim_counts": {
+  "affordability judgement": 91,
+  "stated preference rather than outcome": 85,
+  "parking availability": 2
+ },
+ "examples": [
+  {
+   "row": 5,
+   "alt": 0,
+   "axis": 0,
+   "text": "I spend a negligible CHF 1.63 on fuel for this short trip, hardly denting my budget.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 5,
+   "alt": 0,
+   "axis": 2,
+   "text": "I enjoy a comfortable ride, protected from the weather and able to stretch my legs as needed.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 5,
+   "alt": 2,
+   "axis": 0,
+   "text": "I spend a negligible CHF 2.20 on this trip, a minor dent in my monthly budget.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 5,
+   "alt": 2,
+   "axis": 1,
+   "text": "My total travel time is around 26 minutes, leaving me plenty of time for other activities today.",
+   "unsupported_numerals": [
+    26.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 26,
+   "alt": 0,
+   "axis": 0,
+   "text": "I spend a negligible CHF 2.32 on fuel for this work loop, barely affecting my budget.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 26,
+   "alt": 1,
+   "axis": 0,
+   "text": "I save around CHF 5-10 on fuel with this free option.",
+   "unsupported_numerals": [
+    5.0,
+    -10.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 26,
+   "alt": 2,
+   "axis": 0,
+   "text": "I save around CHF 0.20 compared to driving, which is a minor but welcome budget relief.",
+   "unsupported_numerals": [
+    0.2
+   ],
+   "claims": []
+  },
+  {
+   "row": 35,
+   "alt": 0,
+   "axis": 0,
+   "text": "I spend a relatively small amount of my budget on this trip, CHF 24.80 being negligible for me.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 35,
+   "alt": 0,
+   "axis": 1,
+   "text": "My total travel time is around 3 hours and 33 minutes, which is significant but manageable for a leisure trip.",
+   "unsupported_numerals": [
+    3.0,
+    33.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 35,
+   "alt": 1,
+   "axis": 0,
+   "text": "I save around CHF 10-20 on fuel with this option, a welcome bonus for my household budget.",
+   "unsupported_numerals": [
+    10.0,
+    -20.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 35,
+   "alt": 1,
+   "axis": 1,
+   "text": "This trip will take me significantly longer, around 4-6 hours, which cuts into my leisure time.",
+   "unsupported_numerals": [
+    4.0,
+    -6.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 35,
+   "alt": 2,
+   "axis": 0,
+   "text": "I spend a negligible CHF 7.06 on fuel for this leisure loop, a minor dent in my budget.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 35,
+   "alt": 2,
+   "axis": 2,
+   "text": "I enjoy a comfortable ride, protected from the weather, with ample space for my shopping bags.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 35,
+   "alt": 2,
+   "axis": 3,
+   "text": "I appreciate the flexibility of driving, allowing me to stop whenever I want and carry all my shopping easily.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 53,
+   "alt": 0,
+   "axis": 0,
+   "text": "I spend a negligible CHF 4.33 on fuel for this short trip.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 53,
+   "alt": 0,
+   "axis": 2,
+   "text": "I enjoy a comfortable ride with minimal physical effort and no exposure to weather.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 53,
+   "alt": 2,
+   "axis": 1,
+   "text": "I use up most of my day with a 3 hour and 9 minute journey.",
+   "unsupported_numerals": [
+    3.0,
+    9.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 72,
+   "alt": 0,
+   "axis": 2,
+   "text": "I enjoy a comfortable ride, protected from the weather, with ample seating and minimal stress.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 72,
+   "alt": 2,
+   "axis": 1,
+   "text": "I spend around 4-6 hours walking or cycling, a significant time commitment.",
+   "unsupported_numerals": [
+    4.0,
+    -6.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 81,
+   "alt": 0,
+   "axis": 0,
+   "text": "I spend a negligible CHF 1.09 on fuel for this short trip.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 81,
+   "alt": 0,
+   "axis": 2,
+   "text": "I enjoy a comfortable ride, protected from the weather and able to sit back.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 95,
+   "alt": 0,
+   "axis": 0,
+   "text": "I spend a negligible CHF 11 on this trip, hardly affecting my budget.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 95,
+   "alt": 1,
+   "axis": 0,
+   "text": "I spend a negligible CHF 1.23 on fuel for this short trip loop.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 95,
+   "alt": 1,
+   "axis": 3,
+   "text": "I enjoy the flexibility to leave at any time and carry items with ease.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 95,
+   "alt": 2,
+   "axis": 0,
+   "text": "I save around CHF 10-20 on this short trip with no fuel or fare costs.",
+   "unsupported_numerals": [
+    10.0,
+    -20.0
+   ],
+   "claims": []
+  }
+ ],
+ "note": "a pattern scan is a lower bound; a sentence with no flag is not certified as grounded"
+}

@@ -1,0 +1,267 @@
+{
+ "sentences": 2400,
+ "sentences_with_a_flag": 286,
+ "flagged_rate": 0.11916666666666667,
+ "numerals": 667,
+ "unsupported_numerals": 259,
+ "unsupported_numeral_rate": 0.38830584707646176,
+ "claim_counts": {
+  "affordability judgement": 6,
+  "stated preference rather than outcome": 17,
+  "parking availability": 4,
+  "delay claim": 1
+ },
+ "examples": [
+  {
+   "row": 23,
+   "alt": 0,
+   "axis": 1,
+   "text": "My door-to-door travel time will be approximately 12 minutes, relatively quick.",
+   "unsupported_numerals": [
+    12.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 33,
+   "alt": 0,
+   "axis": 0,
+   "text": "I save around GBP 2.11 on this trip by choosing the free option.",
+   "unsupported_numerals": [
+    2.11
+   ],
+   "claims": []
+  },
+  {
+   "row": 33,
+   "alt": 1,
+   "axis": 0,
+   "text": "I save about GBP 1.81 on this trip with the cheaper fare.",
+   "unsupported_numerals": [
+    1.81
+   ],
+   "claims": []
+  },
+  {
+   "row": 33,
+   "alt": 1,
+   "axis": 1,
+   "text": "I spend around 8 minutes traveling, a relatively short duration.",
+   "unsupported_numerals": [
+    8.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 33,
+   "alt": 2,
+   "axis": 0,
+   "text": "I save around GBP 2.11 on this trip with no fare to pay.",
+   "unsupported_numerals": [
+    2.11
+   ],
+   "claims": []
+  },
+  {
+   "row": 33,
+   "alt": 2,
+   "axis": 1,
+   "text": "I spend about 8 minutes traveling, a quick journey for me.",
+   "unsupported_numerals": [
+    8.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 33,
+   "alt": 3,
+   "axis": 1,
+   "text": "I take around 13 minutes to complete my journey, including walking and waiting.",
+   "unsupported_numerals": [
+    13.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 79,
+   "alt": 2,
+   "axis": 0,
+   "text": "My budget takes a significant hit with this expensive option, exceeding my usual fare.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 79,
+   "alt": 3,
+   "axis": 0,
+   "text": "I save around GBP 3.45 on this commute by not paying a fare.",
+   "unsupported_numerals": [
+    3.45
+   ],
+   "claims": []
+  },
+  {
+   "row": 79,
+   "alt": 3,
+   "axis": 1,
+   "text": "My commute takes about 1 hour and 20 minutes, which is a significant part of my morning.",
+   "unsupported_numerals": [
+    20.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 131,
+   "alt": 1,
+   "axis": 1,
+   "text": "I spend about 14 minutes walking, which is relatively quick.",
+   "unsupported_numerals": [
+    14.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 131,
+   "alt": 2,
+   "axis": 0,
+   "text": "I spend just 20p on fuel for this short trip, a negligible cost to my budget.",
+   "unsupported_numerals": [],
+   "claims": [
+    "affordability judgement"
+   ]
+  },
+  {
+   "row": 131,
+   "alt": 2,
+   "axis": 2,
+   "text": "I enjoy a comfortable, stress-free journey, protected from the weather and able to sit comfortably.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 150,
+   "alt": 0,
+   "axis": 1,
+   "text": "I will arrive at work in about 11 minutes, with some time to spare before starting.",
+   "unsupported_numerals": [
+    11.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 150,
+   "alt": 3,
+   "axis": 1,
+   "text": "I spend about 13 minutes traveling door-to-door.",
+   "unsupported_numerals": [
+    13.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 150,
+   "alt": 3,
+   "axis": 3,
+   "text": "I have flexibility to carry my things and park easily.",
+   "unsupported_numerals": [],
+   "claims": [
+    "parking availability"
+   ]
+  },
+  {
+   "row": 183,
+   "alt": 3,
+   "axis": 1,
+   "text": "I spend about 9 minutes walking, which is a relatively short duration for me.",
+   "unsupported_numerals": [
+    9.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 189,
+   "alt": 0,
+   "axis": 1,
+   "text": "I arrive quickly, taking only 10 minutes to get there.",
+   "unsupported_numerals": [
+    10.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 189,
+   "alt": 2,
+   "axis": 1,
+   "text": "I arrive quickly, with only 7 minutes of travel time.",
+   "unsupported_numerals": [
+    7.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 189,
+   "alt": 3,
+   "axis": 1,
+   "text": "I have a bit more time to relax or work during my 13-minute journey to my destination.",
+   "unsupported_numerals": [
+    13.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 235,
+   "alt": 3,
+   "axis": 1,
+   "text": "I spend about 11 minutes traveling from door to door.",
+   "unsupported_numerals": [
+    11.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 254,
+   "alt": 0,
+   "axis": 1,
+   "text": "My door-to-door travel time will be approximately 14 minutes, which is relatively quick for this distance.",
+   "unsupported_numerals": [
+    14.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 254,
+   "alt": 1,
+   "axis": 0,
+   "text": "I save around GBP 0.77 from my usual trip cost by choosing this option.",
+   "unsupported_numerals": [
+    0.77
+   ],
+   "claims": []
+  },
+  {
+   "row": 254,
+   "alt": 3,
+   "axis": 1,
+   "text": "I spend about 12 minutes traveling from door to door.",
+   "unsupported_numerals": [
+    12.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 297,
+   "alt": 0,
+   "axis": 1,
+   "text": "I spend about 15 minutes traveling, plus walking time to and from stops.",
+   "unsupported_numerals": [
+    15.0
+   ],
+   "claims": []
+  }
+ ],
+ "note": "a pattern scan is a lower bound; a sentence with no flag is not certified as grounded"
+}

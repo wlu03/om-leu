@@ -1,0 +1,70 @@
+{
+ "run_tag": "consequence-20260910T094713Z-31092",
+ "original_checkout": "/Users/wesleylu/Projects/Research/structure_descent",
+ "original_branch": "goleu-redesign",
+ "base_sha": "6a1774ebc266e1a72bf1e605e43a99086a85e1db",
+ "branch_prefix": "exp/consequence-20260910T094713Z-31092",
+ "worktree_root": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-worktrees",
+ "artifact_root": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-artifacts",
+ "created_utc": "2026-09-10T09:47:14Z",
+ "original_working_tree_clean_at_creation": true,
+ "worktrees": {
+  "00-foundation": {
+   "path": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-worktrees/00-foundation",
+   "branch": "exp/consequence-20260910T094713Z-31092/00-foundation",
+   "base": "6a1774ebc266e1a72bf1e605e43a99086a85e1db",
+   "owner": "coordinator"
+  },
+  "01-grounded": {
+   "path": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-worktrees/01-grounded",
+   "branch": "exp/consequence-20260910T094713Z-31092/01-grounded",
+   "base": "2c42d741bc2eb79d0a50b7e461336c67b3d417a4",
+   "owner": "E1"
+  },
+  "02-axis": {
+   "path": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-worktrees/02-axis",
+   "branch": "exp/consequence-20260910T094713Z-31092/02-axis",
+   "base": "2c42d741bc2eb79d0a50b7e461336c67b3d417a4",
+   "owner": "E2"
+  },
+  "03-interventions": {
+   "path": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-worktrees/03-interventions",
+   "branch": "exp/consequence-20260910T094713Z-31092/03-interventions",
+   "base": "2c42d741bc2eb79d0a50b7e461336c67b3d417a4",
+   "owner": "E3"
+  },
+  "04-complementarity": {
+   "path": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-worktrees/04-complementarity",
+   "branch": "exp/consequence-20260910T094713Z-31092/04-complementarity",
+   "base": "2c42d741bc2eb79d0a50b7e461336c67b3d417a4",
+   "owner": "E4"
+  },
+  "05-uncertainty": {
+   "path": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-worktrees/05-uncertainty",
+   "branch": "exp/consequence-20260910T094713Z-31092/05-uncertainty",
+   "base": "2c42d741bc2eb79d0a50b7e461336c67b3d417a4",
+   "owner": "E5"
+  },
+  "06-transfer": {
+   "path": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-worktrees/06-transfer",
+   "branch": "exp/consequence-20260910T094713Z-31092/06-transfer",
+   "base": "2c42d741bc2eb79d0a50b7e461336c67b3d417a4",
+   "owner": "E6"
+  },
+  "07-gate": {
+   "path": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-worktrees/07-gate",
+   "branch": "exp/consequence-20260910T094713Z-31092/07-gate",
+   "base": "2c42d741bc2eb79d0a50b7e461336c67b3d417a4",
+   "owner": "E7"
+  },
+  "90-integration": {
+   "path": "/Users/wesleylu/Projects/Research/structure_descent-consequence-20260910T094713Z-31092-worktrees/90-integration",
+   "branch": "exp/consequence-20260910T094713Z-31092/90-integration",
+   "base": "2c42d741bc2eb79d0a50b7e461336c67b3d417a4",
+   "owner": "coordinator"
+  }
+ },
+ "foundation_sha": "2c42d741bc2eb79d0a50b7e461336c67b3d417a4",
+ "execution_mode": "sequential in one session; no parallel coding agents were used",
+ "training_concurrency": 1
+}

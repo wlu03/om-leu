@@ -1,0 +1,266 @@
+{
+ "sentences": 1800,
+ "sentences_with_a_flag": 474,
+ "flagged_rate": 0.2633333333333333,
+ "numerals": 991,
+ "unsupported_numerals": 148,
+ "unsupported_numeral_rate": 0.14934409687184663,
+ "claim_counts": {
+  "stated preference rather than outcome": 341,
+  "parking availability": 1,
+  "affordability judgement": 1
+ },
+ "examples": [
+  {
+   "row": 20,
+   "alt": 0,
+   "axis": 2,
+   "text": "I enjoy a comfortable ride with ample seating and minimal noise, able to rest or focus.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 20,
+   "alt": 0,
+   "axis": 3,
+   "text": "I appreciate the convenient departures every 20 minutes, fitting my schedule with ease and minimal transfers.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 20,
+   "alt": 2,
+   "axis": 2,
+   "text": "I enjoy a comfortable drive with ample space for my luggage and minimal noise.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 145,
+   "alt": 0,
+   "axis": 2,
+   "text": "I enjoy comfortable airline-style seating with reserved seats.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 145,
+   "alt": 0,
+   "axis": 3,
+   "text": "I appreciate the convenience of departures every 10 minutes.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 145,
+   "alt": 1,
+   "axis": 2,
+   "text": "I enjoy a comfortable drive with ample space for my luggage.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 145,
+   "alt": 2,
+   "axis": 2,
+   "text": "I enjoy comfortable seating and minimal crowding during my commute.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 146,
+   "alt": 0,
+   "axis": 2,
+   "text": "I enjoy a comfortable drive with ample space for my luggage.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 146,
+   "alt": 1,
+   "axis": 2,
+   "text": "I enjoy comfortable seating and minimal crowding during my commute.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 146,
+   "alt": 2,
+   "axis": 2,
+   "text": "I enjoy comfortable seating and minimal noise during the trip.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 146,
+   "alt": 2,
+   "axis": 3,
+   "text": "I appreciate the flexibility of departures every 20 minutes.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 153,
+   "alt": 0,
+   "axis": 1,
+   "text": "I'll spend almost 4 hours traveling from door to door.",
+   "unsupported_numerals": [
+    4.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 153,
+   "alt": 1,
+   "axis": 2,
+   "text": "I enjoy a comfortable drive with minimal crowding and easy luggage handling.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 153,
+   "alt": 2,
+   "axis": 2,
+   "text": "I enjoy relatively quiet and comfortable seating with ample space for my luggage.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 153,
+   "alt": 2,
+   "axis": 3,
+   "text": "I appreciate the flexibility of departures every 20 minutes, fitting my commute schedule easily.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 200,
+   "alt": 0,
+   "axis": 2,
+   "text": "I enjoy comfortable seating and minimal noise during the trip with my one piece of luggage.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 200,
+   "alt": 1,
+   "axis": 2,
+   "text": "I enjoy relatively comfortable seating and can handle my luggage easily on this trip.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 200,
+   "alt": 2,
+   "axis": 2,
+   "text": "I enjoy a comfortable drive with my luggage easily stored, minimal noise, and no crowding.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 305,
+   "alt": 1,
+   "axis": 2,
+   "text": "I enjoy comfortable seating and can rest during the 2-hour journey with my luggage nearby.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 305,
+   "alt": 2,
+   "axis": 2,
+   "text": "I enjoy comfortable seating and minimal noise, with easy luggage handling in my own car.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 361,
+   "alt": 0,
+   "axis": 2,
+   "text": "I enjoy comfortable seating and minimal noise, making the journey restful with my luggage handled easily.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 361,
+   "alt": 1,
+   "axis": 2,
+   "text": "I enjoy comfortable seating and minimal crowding with my single piece of luggage.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 361,
+   "alt": 2,
+   "axis": 1,
+   "text": "I spend 1 hour and 44 minutes traveling, with some time to work or relax.",
+   "unsupported_numerals": [
+    44.0
+   ],
+   "claims": []
+  },
+  {
+   "row": 361,
+   "alt": 2,
+   "axis": 2,
+   "text": "I enjoy comfortable seating and sufficient space for my luggage on this trip.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  },
+  {
+   "row": 411,
+   "alt": 1,
+   "axis": 2,
+   "text": "I enjoy comfortable driving, minimal crowding, and easy luggage handling.",
+   "unsupported_numerals": [],
+   "claims": [
+    "stated preference rather than outcome"
+   ]
+  }
+ ],
+ "note": "a pattern scan is a lower bound; a sentence with no flag is not certified as grounded"
+}
