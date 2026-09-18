@@ -1,0 +1,6 @@
+{
+ "dataset": "lpmc",
+ "seed": 13,
+ "method": "rumboost",
+ "error": "Traceback (most recent call last):\n  File \"/Users/wesleylu/Projects/Research/structure_descent/methods/run_methods.py\", line 111, in main\n    res = _run_one(dataset, seed, method, ds, out)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/wesleylu/Projects/Research/structure_descent/methods/run_methods.py\", line 67, in _run_one\n    subprocess.run([sys.executable, __file__, \"--_child\", dataset, str(seed), method, str(tmp),\n  File \"/opt/homebrew/Cellar/python@3.12/3.12.13_2/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py\", line 571, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['/Users/wesleylu/Projects/Research/structure_descent/venv/bin/python', '/Users/wesleylu/Projects/Research/structure_descent/methods/run_methods.py', '--_child', 'lpmc', '13', 'rumboost', 'methods/results_person/lpmc/rumboost/seed_13.npz', 'person']' died with <Signals.SIGSEGV: 11>.\n"
+}

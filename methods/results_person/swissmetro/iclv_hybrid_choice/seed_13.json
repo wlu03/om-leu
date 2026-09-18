@@ -1,0 +1,7 @@
+{
+ "dataset": "swissmetro",
+ "seed": 13,
+ "method": "iclv_hybrid_choice",
+ "label": "ICLV hybrid choice (latent attitude)",
+ "skipped": "swissmetro has no attitudinal indicators; ICLV not applicable"
+}

@@ -1,0 +1,7 @@
+{
+ "dataset": "lpmc",
+ "seed": 11,
+ "method": "iclv_hybrid_choice",
+ "label": "ICLV hybrid choice (latent attitude)",
+ "skipped": "lpmc has no attitudinal indicators; ICLV not applicable"
+}

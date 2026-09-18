@@ -27,7 +27,7 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from methods.common.data import apply_person_split, load_dataset  # noqa: E402  (numpy/pandas only)
+from methods.common.data import apply_person_split_from_file, load_dataset, write_person_split  # noqa: E402  (numpy/pandas only)
 
 # LightGBM and torch each bundle their own libomp; loading both in one process
 # segfaults on macOS. The boosting methods therefore run in a torch-free child
@@ -51,10 +51,14 @@ LABELS = {
 }
 
 
-def _child(dataset: str, seed: int, method: str, out: Path, protocol: str = "historical") -> None:
-    ds = load_dataset(dataset, seed)
+def _child(dataset: str, seed: int, method: str, out: Path, protocol: str = "historical",
+           with_history: str = "0") -> None:
+    # This child also runs the boosting models, and LightGBM cannot share a process with torch
+    # on this machine.  The person-disjoint assignment is therefore computed by the parent and
+    # read from a file here, so the child never imports torch.
+    ds = load_dataset(dataset, seed, with_history=with_history == "1")
     if protocol == "person":
-        ds = apply_person_split(ds, seed)
+        ds = apply_person_split_from_file(ds, dataset, seed)
     mod = importlib.import_module(f"methods.{method}.model")
     res = mod.run(ds, seed)
     np.savez(out, probs=np.asarray(res["probs_test"]), n_params=int(res["n_params"]),
@@ -65,7 +69,8 @@ def _run_one(dataset: str, seed: int, method: str, ds, out: Path) -> dict:
     if method in BOOSTING:
         tmp = out.with_suffix(".npz")
         subprocess.run([sys.executable, __file__, "--_child", dataset, str(seed), method, str(tmp),
-                        os.environ.get("METHODS_PROTOCOL", "historical")],
+                        os.environ.get("METHODS_PROTOCOL", "historical"),
+                        os.environ.get("METHODS_HISTORY", "0")],
                        check=True, cwd=str(REPO_ROOT))
         z = np.load(tmp, allow_pickle=False)
         res = {"probs_test": z["probs"], "n_params": int(z["n_params"]),
@@ -79,7 +84,8 @@ def _run_one(dataset: str, seed: int, method: str, ds, out: Path) -> dict:
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "--_child":
         _child(sys.argv[2], int(sys.argv[3]), sys.argv[4], Path(sys.argv[5]),
-               sys.argv[6] if len(sys.argv) > 6 else "historical")
+               sys.argv[6] if len(sys.argv) > 6 else "historical",
+               sys.argv[7] if len(sys.argv) > 7 else "0")
         return
     from methods.common.metrics import evaluate  # imports torch; keep out of the child
 
@@ -93,13 +99,20 @@ def main() -> None:
                     help="historical: the chronological within-person split shipped with the records. "
                          "person: re-partition so every event of a respondent lies in one split, using "
                          "the same draw as the proposed model's person-disjoint protocol.")
+    ap.add_argument("--with-history", action="store_true",
+                    help="give the reference models the two per-alternative history columns the "
+                         "proposed model's structural stage uses, so the comparison is not "
+                         "confounded by unequal information")
     args = ap.parse_args()
 
     for dataset in args.datasets:
         for seed in args.seeds:
-            ds = load_dataset(dataset, seed)
+            ds = load_dataset(dataset, seed, with_history=args.with_history)
+            if args.with_history:
+                os.environ["METHODS_HISTORY"] = "1"
             if args.protocol == "person":
-                ds = apply_person_split(ds, seed)
+                write_person_split(ds, dataset, seed)
+                ds = apply_person_split_from_file(ds, dataset, seed)
                 os.environ["METHODS_PROTOCOL"] = "person"
             for method in args.methods:
                 out = args.out / dataset / method / f"seed_{seed}.json"

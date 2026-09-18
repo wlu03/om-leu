@@ -13,6 +13,7 @@ Alignment: a record in ``records.pkl`` carries ``(customer_id, order_date)``;
 from __future__ import annotations
 
 import os
+import json
 import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -255,51 +256,83 @@ def _event_lookup(dataset: str) -> Dict[tuple, str]:
     return out
 
 
-def apply_person_split(ds: "ChoiceDataset", seed: int) -> "ChoiceDataset":
-    """Re-partition so every event of a respondent lies in one split.
+SPLIT_CACHE = REPO_ROOT / "methods" / "results_person" / "_splits"
 
-    This reproduces ``experiments.models.omleu2.cold_start_view`` exactly -- same generator
-    seed, same person indexing (sorted unique identifiers), same 15/15/70 assignment order --
-    so the baselines are scored on the identical partition the proposed model is scored on.
-    ``verify_person_split`` in that module's test checks the two agree person for person.
+
+def write_person_split(ds: "ChoiceDataset", dataset: str, seed: int) -> Path:
+    """Compute the person-disjoint assignment with torch and cache it as JSON.
+
+    The proposed model draws this partition with ``torch.randperm`` seeded at ``seed + 31``
+    over persons indexed by their sorted identifiers; we reproduce it exactly here, in the
+    parent process, because the child that runs the boosting models cannot import torch.
     """
     import torch
 
     names = ("train", "val", "test")
     persons = np.concatenate([ds.splits[n].person for n in names])
     uniq = sorted(set(persons.tolist()))
-    index_of = {p: i for i, p in enumerate(uniq)}
-    n_persons = len(uniq)
-
     g = torch.Generator().manual_seed(seed + 31)
-    perm = torch.randperm(n_persons, generator=g).numpy()
-    n_val = n_te = int(round(0.15 * n_persons))
-    part = np.zeros(n_persons, dtype=np.int8)
+    perm = torch.randperm(len(uniq), generator=g).numpy()
+    n_val = n_te = int(round(0.15 * len(uniq)))
+    part = np.zeros(len(uniq), dtype=int)
     part[perm[:n_te]] = 2
     part[perm[n_te:n_te + n_val]] = 1
-    assign = np.array([part[index_of[p]] for p in persons])
+    SPLIT_CACHE.mkdir(parents=True, exist_ok=True)
+    f = SPLIT_CACHE / f"{dataset}_seed{seed}.json"
+    f.write_text(json.dumps({p: int(c) for p, c in zip(uniq, part)}))
+    return f
 
-    stacked = {f: np.concatenate([getattr(ds.splits[n], f) for n in names])
-               for f in ("X", "Z", "y", "person", "event_id")}
+
+def apply_person_split_from_file(ds: "ChoiceDataset", dataset: str, seed: int) -> "ChoiceDataset":
+    """Re-partition so every event of a respondent lies in one split, using the cached
+    assignment written by :func:`write_person_split`.  Covariate standardisation is refitted on
+    the new training rows."""
+    f = SPLIT_CACHE / f"{dataset}_seed{seed}.json"
+    code = json.loads(f.read_text())
+    names = ("train", "val", "test")
+    stacked = {k: np.concatenate([getattr(ds.splits[n], k) for n in names])
+               for k in ("X", "Z", "y", "person", "event_id")}
     I_parts = [ds.splits[n].I for n in names]
     stacked["I"] = None if any(x is None for x in I_parts) else np.concatenate(I_parts)
-
+    assign = np.array([code[str(p)] for p in stacked["person"]])
     new_splits = {}
     for name, c in (("train", 0), ("val", 1), ("test", 2)):
         m = assign == c
         new_splits[name] = ChoiceSplit(name=name, X=stacked["X"][m], Z=stacked["Z"][m], y=stacked["y"][m],
                                        person=stacked["person"][m], event_id=stacked["event_id"][m],
                                        I=None if stacked["I"] is None else stacked["I"][m])
-    mu = new_splits["train"].Z.mean(0)
-    sd = new_splits["train"].Z.std(0)
-    keep = sd > 1e-6
+    mu = new_splits["train"].Z.mean(0); sd = new_splits["train"].Z.std(0); keep = sd > 1e-6
     for name in new_splits:
         new_splits[name].Z = np.where(keep, (new_splits[name].Z - mu) / np.where(keep, sd, 1.0), 0.0).astype(np.float32)
     ds.splits = new_splits
     return ds
 
 
-def load_dataset(dataset: str, seed: int) -> ChoiceDataset:
+def _history_columns(dataset: str, seed: int, recs) -> Dict[str, np.ndarray]:
+    """Per-alternative history from the records: (is_repeat, log1p(prior purchases)).
+
+    These are the two columns the proposed model's structural stage uses, read from the same
+    source, so that a comparison between them is not confounded by one side having features
+    the other lacks.  Counts are strictly prior to the event by construction of the records.
+    """
+    alts = ALTS[dataset]
+    out = {}
+    for name in ("train", "val", "test"):
+        rows = []
+        for r in recs[name]:
+            per_alt = {a: (0.0, 0.0) for a in alts}
+            for a, txt in zip(r["choice_asins"], r["alt_texts"]):
+                try:
+                    per_alt[a] = (float(txt.get("is_repeat") or 0.0),
+                                  float(np.log1p(float(txt.get("purchase_count") or 0.0))))
+                except Exception:
+                    per_alt[a] = (0.0, 0.0)
+            rows.append([per_alt[a] for a in alts])
+        out[name] = np.asarray(rows, dtype=np.float32)          # (n, J, 2)
+    return out
+
+
+def load_dataset(dataset: str, seed: int, with_history: bool = False) -> ChoiceDataset:
     """Build a :class:`ChoiceDataset` aligned to ``records.pkl`` of ``seed``."""
     if dataset not in ALTS:
         raise ValueError(f"unknown dataset {dataset!r}; choose from {sorted(ALTS)}")
@@ -307,6 +340,7 @@ def load_dataset(dataset: str, seed: int) -> ChoiceDataset:
     if not path.exists():
         raise FileNotFoundError(f"{path} not found; run the OM-LEU pipeline for {dataset} seed {seed} first")
     recs = pickle.load(open(path, "rb"))
+    hist_cols = _history_columns(dataset, seed, recs) if with_history else None
     df, X_all, Z_all, I_all = _raw(dataset)
     row_of = {eid: i for i, eid in enumerate(df["event_id"].values)}
     lookup = _event_lookup(dataset)
@@ -331,9 +365,12 @@ def load_dataset(dataset: str, seed: int) -> ChoiceDataset:
             persons.append(str(r["customer_id"]))
             eids.append(eid)
         rows = np.asarray(rows)
+        Xs = X_all[rows]
+        if with_history:
+            Xs = np.concatenate([Xs, hist_cols[name]], axis=-1)
         splits[name] = ChoiceSplit(
             name=name,
-            X=X_all[rows],
+            X=Xs,
             Z=Z_np[rows],
             y=np.asarray(ys, dtype=np.int64),
             person=np.asarray(persons),
@@ -353,7 +390,8 @@ def load_dataset(dataset: str, seed: int) -> ChoiceDataset:
         dataset=dataset,
         seed=seed,
         alts=alts,
-        alt_feature_names=ALT_FEATURES[dataset],
+        alt_feature_names=(ALT_FEATURES[dataset] + ["is_repeat", "log1p_prior_choices"]
+                           if with_history else ALT_FEATURES[dataset]),
         z_names=z_cols,
         indicator_names=OPTIMA_INDICATORS if I_all is not None else [],
         nests=NESTS[dataset],
