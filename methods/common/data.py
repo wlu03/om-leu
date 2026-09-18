@@ -255,6 +255,50 @@ def _event_lookup(dataset: str) -> Dict[tuple, str]:
     return out
 
 
+def apply_person_split(ds: "ChoiceDataset", seed: int) -> "ChoiceDataset":
+    """Re-partition so every event of a respondent lies in one split.
+
+    This reproduces ``experiments.models.omleu2.cold_start_view`` exactly -- same generator
+    seed, same person indexing (sorted unique identifiers), same 15/15/70 assignment order --
+    so the baselines are scored on the identical partition the proposed model is scored on.
+    ``verify_person_split`` in that module's test checks the two agree person for person.
+    """
+    import torch
+
+    names = ("train", "val", "test")
+    persons = np.concatenate([ds.splits[n].person for n in names])
+    uniq = sorted(set(persons.tolist()))
+    index_of = {p: i for i, p in enumerate(uniq)}
+    n_persons = len(uniq)
+
+    g = torch.Generator().manual_seed(seed + 31)
+    perm = torch.randperm(n_persons, generator=g).numpy()
+    n_val = n_te = int(round(0.15 * n_persons))
+    part = np.zeros(n_persons, dtype=np.int8)
+    part[perm[:n_te]] = 2
+    part[perm[n_te:n_te + n_val]] = 1
+    assign = np.array([part[index_of[p]] for p in persons])
+
+    stacked = {f: np.concatenate([getattr(ds.splits[n], f) for n in names])
+               for f in ("X", "Z", "y", "person", "event_id")}
+    I_parts = [ds.splits[n].I for n in names]
+    stacked["I"] = None if any(x is None for x in I_parts) else np.concatenate(I_parts)
+
+    new_splits = {}
+    for name, c in (("train", 0), ("val", 1), ("test", 2)):
+        m = assign == c
+        new_splits[name] = ChoiceSplit(name=name, X=stacked["X"][m], Z=stacked["Z"][m], y=stacked["y"][m],
+                                       person=stacked["person"][m], event_id=stacked["event_id"][m],
+                                       I=None if stacked["I"] is None else stacked["I"][m])
+    mu = new_splits["train"].Z.mean(0)
+    sd = new_splits["train"].Z.std(0)
+    keep = sd > 1e-6
+    for name in new_splits:
+        new_splits[name].Z = np.where(keep, (new_splits[name].Z - mu) / np.where(keep, sd, 1.0), 0.0).astype(np.float32)
+    ds.splits = new_splits
+    return ds
+
+
 def load_dataset(dataset: str, seed: int) -> ChoiceDataset:
     """Build a :class:`ChoiceDataset` aligned to ``records.pkl`` of ``seed``."""
     if dataset not in ALTS:

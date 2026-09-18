@@ -27,7 +27,7 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from methods.common.data import load_dataset  # noqa: E402  (numpy/pandas only)
+from methods.common.data import apply_person_split, load_dataset  # noqa: E402  (numpy/pandas only)
 
 # LightGBM and torch each bundle their own libomp; loading both in one process
 # segfaults on macOS. The boosting methods therefore run in a torch-free child
@@ -51,8 +51,10 @@ LABELS = {
 }
 
 
-def _child(dataset: str, seed: int, method: str, out: Path) -> None:
+def _child(dataset: str, seed: int, method: str, out: Path, protocol: str = "historical") -> None:
     ds = load_dataset(dataset, seed)
+    if protocol == "person":
+        ds = apply_person_split(ds, seed)
     mod = importlib.import_module(f"methods.{method}.model")
     res = mod.run(ds, seed)
     np.savez(out, probs=np.asarray(res["probs_test"]), n_params=int(res["n_params"]),
@@ -62,7 +64,8 @@ def _child(dataset: str, seed: int, method: str, out: Path) -> None:
 def _run_one(dataset: str, seed: int, method: str, ds, out: Path) -> dict:
     if method in BOOSTING:
         tmp = out.with_suffix(".npz")
-        subprocess.run([sys.executable, __file__, "--_child", dataset, str(seed), method, str(tmp)],
+        subprocess.run([sys.executable, __file__, "--_child", dataset, str(seed), method, str(tmp),
+                        os.environ.get("METHODS_PROTOCOL", "historical")],
                        check=True, cwd=str(REPO_ROOT))
         z = np.load(tmp, allow_pickle=False)
         res = {"probs_test": z["probs"], "n_params": int(z["n_params"]),
@@ -75,7 +78,8 @@ def _run_one(dataset: str, seed: int, method: str, ds, out: Path) -> dict:
 
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "--_child":
-        _child(sys.argv[2], int(sys.argv[3]), sys.argv[4], Path(sys.argv[5]))
+        _child(sys.argv[2], int(sys.argv[3]), sys.argv[4], Path(sys.argv[5]),
+               sys.argv[6] if len(sys.argv) > 6 else "historical")
         return
     from methods.common.metrics import evaluate  # imports torch; keep out of the child
 
@@ -85,11 +89,18 @@ def main() -> None:
     ap.add_argument("--seeds", nargs="+", type=int, default=[7, 11, 13])
     ap.add_argument("--out", type=Path, default=REPO_ROOT / "methods" / "results")
     ap.add_argument("--force", action="store_true", help="re-run even if the result json exists")
+    ap.add_argument("--protocol", default="historical", choices=["historical", "person"],
+                    help="historical: the chronological within-person split shipped with the records. "
+                         "person: re-partition so every event of a respondent lies in one split, using "
+                         "the same draw as the proposed model's person-disjoint protocol.")
     args = ap.parse_args()
 
     for dataset in args.datasets:
         for seed in args.seeds:
             ds = load_dataset(dataset, seed)
+            if args.protocol == "person":
+                ds = apply_person_split(ds, seed)
+                os.environ["METHODS_PROTOCOL"] = "person"
             for method in args.methods:
                 out = args.out / dataset / method / f"seed_{seed}.json"
                 if out.exists() and not args.force:
