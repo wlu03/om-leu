@@ -46,9 +46,9 @@ clean. Every variant sees the same text, encoder, base model and ensembling budg
       as well as the generated text whenever the channel is scored alone (\Cref{tab:main}).
 \item After erasing from the text representation every direction linearly predictable from
       the alternative's attributes, its identity and the person covariates, a contribution
-      of $0.017$ nats survives on \dataset{LPMC} with the interval excluding zero, and
-      nothing survives on \dataset{Optima} (\Cref{tab:identification}). The cost of erasure
-      measures how much of the raw gain was restatement: on \dataset{LPMC}, $40\%$.
+      survives on three of four datasets and not on the fourth
+      (\Cref{tab:identification}). What erasure costs differs sharply between them and is
+      itself informative.
 \item No designed reader beats an ordinary two-layer network given the same information
       (\Cref{tab:structural}), and four proposed improvements produce no gain
       (\Cref{sec:negative}).

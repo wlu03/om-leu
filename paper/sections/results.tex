@@ -59,13 +59,27 @@ from the attributes, the alternative identity and the covariates.}
 \input{tables/identification}
 \end{table}
 
-\Cref{tab:identification} is the central result. On \dataset{LPMC} the unerased channel beats
-its control by $0.030$; after erasure $0.017$ remains, with the interval excluding zero. The
-difference between those two numbers is the part of the raw gain that was linearly recoverable
-from the attributes: $40\%$ of it. Training against the attribute model's own predictions
-gives a larger surviving difference still. On \dataset{Optima} every contrast has an interval
-containing zero, the largest being $+0.0016$: there is no event-specific content to identify,
-and the small gain visible in \Cref{tab:main} is combination.
+\Cref{tab:identification} is the central result. An identified contribution survives on three
+of the four datasets and not on the fourth, and the amount erasure removes differs sharply
+between them.
+
+On \dataset{LPMC} the unerased channel beats its control by $0.030$ and $0.017$ survives
+erasure, so $43\%$ of the raw gain was linearly recoverable from the attributes and the rest
+was not. On \dataset{Swissmetro} the contribution is smaller, $0.009$, but erasure costs
+\emph{nothing}: the unerased and erased channels are within $0.0003$ of each other, so what the
+text contributes there was never a restatement to begin with. On \dataset{Amazon} erasure
+\emph{improves} the channel, from $0.020$ to $0.042$, which is what one expects when the
+generated text encodes an attribute the model already has -- the probe of
+\Cref{sec:identification} recovers half the held-out price variance from that text -- and
+removing that direction leaves the reader only what is not duplicated. On \dataset{Optima}
+every contrast has an interval containing zero, the largest being $+0.0016$: there is no
+event-specific content to identify, and the small pooled gain in \Cref{tab:main} is
+combination.
+
+The ranking by identified content differs from the ranking by unerased difference, so the
+pooled numbers do not indicate which datasets have content. The \dataset{Amazon} row rests on
+one seed, that dataset having one exported seed, with the interval from clustering over $99$
+respondents rather than over seeds.
 
 \subsection{Architecture}
 
@@ -78,13 +92,6 @@ the pool; the personalised weights, the attention, the auxiliary loss and the sl
 change the pooled score by less than $0.004$.
 
 \subsection{Protocol dependence}
-
-\begin{table}[t]
-\caption{\dataset{LPMC}, the only dataset whose ordering field is calendar time.}
-\label{tab:protocol}
-\centering\small
-\input{tables/protocol}
-\end{table}
 
 Under the respondent-disjoint split the generated text is the best channel; under the
 time-respecting split on the same data a shuffled control beats it and a text-free channel

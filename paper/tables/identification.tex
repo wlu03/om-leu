@@ -2,6 +2,11 @@
 \toprule
 dataset & channel & NLL & its control & difference [95\% CI] \\
 \midrule
+Swissmetro & no orthogonalisation & 0.6087 & 0.6170 & +0.0083$^{*}$ [+0.0043, +0.0126] \\
+ & erasure & 0.6087 & 0.6173 & +0.0086$^{*}$ [+0.0045, +0.0132] \\
+ & residual offset & 0.6108 & 0.6172 & +0.0063$^{*}$ [+0.0027, +0.0101] \\
+ & erasure + residual offset & 0.6150 & 0.6172 & +0.0022$^{*}$ [+0.0002, +0.0043] \\
+\addlinespace
 Optima & no orthogonalisation & 0.4003 & 0.4019 & +0.0016 [-0.0039, +0.0069] \\
  & erasure & 0.4008 & 0.4018 & +0.0010 [-0.0020, +0.0043] \\
  & residual offset & 0.3982 & 0.3975 & -0.0007 [-0.0057, +0.0041] \\
@@ -9,8 +14,13 @@ Optima & no orthogonalisation & 0.4003 & 0.4019 & +0.0016 [-0.0039, +0.0069] \\
 \addlinespace
 LPMC & no orthogonalisation & 0.4707 & 0.5004 & +0.0297$^{*}$ [+0.0160, +0.0454] \\
  & erasure & 0.4830 & 0.4998 & +0.0169$^{*}$ [+0.0073, +0.0267] \\
- & residual offset & 0.5011 & 0.5487 & +0.0476$^{*}$ [+0.0280, +0.0699] \\
+ & residual offset & 0.4686 & 0.5003 & +0.0317$^{*}$ [+0.0171, +0.0476] \\
  & erasure + residual offset & 0.4751 & 0.5001 & +0.0251$^{*}$ [+0.0135, +0.0371] \\
+\addlinespace
+Amazon & no orthogonalisation & 1.4459 & 1.4662 & +0.0203 [-0.0084, +0.0516] \\
+ & erasure & 1.4252 & 1.4671 & +0.0419$^{*}$ [+0.0090, +0.0799] \\
+ & residual offset & 1.4583 & 1.4943 & +0.0360 [-0.0011, +0.0761] \\
+ & erasure + residual offset & 1.4485 & 1.4952 & +0.0467$^{*}$ [+0.0077, +0.0895] \\
 \addlinespace
 \bottomrule
 \end{tabular}

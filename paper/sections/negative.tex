@@ -15,21 +15,18 @@ generated text whenever the channel is scored alone.
 \paragraph{Consistency training.} If the representation tracks outcome magnitudes rather than
 wording, raising a fare should lower the financial score and leave the time score alone, and a
 claim-preserving paraphrase should move nothing. We built an edit registry with units,
-eligibility rules and declared affected and unaffected axes, and paraphrase families preserving
-quantities, negation polarity and evidence status, holding out families and magnitudes for
-evaluation. Training on these objectives produced no predictive gain. More informative than the
-score: on held-out edit types the score moves in the wrong direction on $25$--$43\%$ of eligible
-events, and the ordering loss barely changes that. The representation is not behaviourally
-consistent, and making it more consistent did not make it more accurate.
+eligibility rules and declared affected and unaffected axes, plus paraphrase families preserving
+quantities, negation polarity and evidence status, holding out families and magnitudes. Training
+on these objectives produced no predictive gain, and on held-out edit types the score still
+moves in the wrong direction on $25$--$43\%$ of eligible events.
 
 \paragraph{Complementarity-aware training.} Fine-tuning on
 $-\log((1-\pi_{\text{train}}) p^{\text{attr}}_{y} + \pi_{\text{train}} q_{y})$ with the
-attribute side detached and produced by inner folds inside the outer training partition. The
-gradient identity $\nabla \mathcal{L} = \rho\,\nabla(-\log q_y)$ with
-$\rho = \pi q_y / ((1-\pi)p_y + \pi q_y)$ is verified against autograd. The pool did not
-improve and the standalone scores became worse. Note that the erasure device of
-\Cref{sec:identification} targets a different quantity -- restatement rather than redundancy --
-and does produce a measurable effect.
+attribute side detached and produced by inner folds inside the outer training partition; the
+gradient identity $\nabla \mathcal{L} = \rho\,\nabla(-\log q_y)$,
+$\rho = \pi q_y / ((1-\pi)p_y + \pi q_y)$, is verified against autograd. The pool did not
+improve and standalone scores became worse. The erasure device of \Cref{sec:identification}
+targets restatement rather than redundancy and does produce a measurable effect.
 
 \paragraph{Conditional weight.} A regularised logistic gate over history length, a missingness
 indicator and choice-set size, fitted only on held-out channel predictions and shrunk towards
@@ -41,22 +38,10 @@ $\partial p_j/\partial x = (1-\pi)\,\partial q_j/\partial x + \pi\,\partial r_j/
 (r_j - q_j)\,\partial \pi/\partial x$; a sign constraint inside the residual binds only the
 first term.
 
-\subsection{Why a component can matter alone and not in the pool}
-\label{sec:why-weights}
-
-The largest knock-out disappears when the channel is pooled, and the reason is measurable
-rather than rhetorical. The personalisation is genuine: a variant that learns \emph{one} weight
-vector shared by everybody recovers none of the loss. But the loss is a tail rather than a
-shift, those tail events are ones the attribute model already ranks correctly, and
-\Cref{eq:floor} bounds what such a failure can cost in the pool. Measured attenuation is
-$25.9\times$ on \dataset{Optima} and $21.9\times$ on \dataset{LPMC}. The component raises
-average accuracy without changing which events the text channel wins, and that is what a
-probability pool discards. \Cref{app:weights} gives the numbers.
-
-\subsection{Transfer and sample size}
-
-A scorer trained on one dataset and frozen is worse than fitting on the target in all six
-ordered directions; fine-tuning recovers most of the difference, so the transferred parameters
-are a reasonable initialisation rather than a transferable notion of outcome level. Learning
-curves subsampling whole households show templated facts leading generated text at every
-training size. Both tables are in \Cref{app:extra}.
+\paragraph{Two further observations.} A component can matter when the channel is scored alone
+and not at all in the pool: the largest knock-out attenuates by $22$--$26\times$, because the
+loss it causes is a tail on events the attribute model already ranks correctly and
+\Cref{eq:floor} bounds what that can cost (\Cref{app:weights}). And a scorer trained on one
+dataset and frozen is worse than fitting on the target in all six ordered directions, while
+learning curves show templated facts leading generated text at every training size
+(\Cref{app:extra}).

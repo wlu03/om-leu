@@ -18,7 +18,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from experiments.harness.data import load_bundle, results_dir  # noqa: E402
 
-DATASETS = ["swissmetro", "optima", "lpmc"]
+DATASETS = ["swissmetro", "optima", "lpmc", "amazon"]
 SEEDS = [7, 11, 13]
 PAIRS = [("id_plain", "id_plain_shuffled", "no orthogonalisation"),
          ("id_erase", "id_erase_shuffled", "erasure"),

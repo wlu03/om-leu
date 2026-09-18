@@ -1,15 +1,17 @@
 \section{Discussion}
 \label{sec:discussion}
 
-\paragraph{What the evidence supports.} On one of four datasets the generated text carries a
-contribution that survives every control we could construct, including erasure of the
-attribute span and a weight-matched uninformative channel: $0.017$ nats on \dataset{LPMC},
-interval excluding zero. On \dataset{Optima} there is a gain in the pooled model and no
-identified content behind it. On \dataset{Swissmetro} and \dataset{Amazon} the pooled gain is
-the bound of \Cref{eq:floor}. The honest summary is that generated consequence text can carry
-choice-relevant information beyond the attributes it was generated from, that this is the
-exception rather than the rule across our datasets, and that the difference between the
-datasets is visible only with the procedure of \Cref{sec:identification}.
+\paragraph{What the evidence supports.} On three of four datasets the generated text carries a
+contribution that survives erasure of the attribute span and its own shuffled control:
+$0.017$ nats on \dataset{LPMC}, $0.009$ on \dataset{Swissmetro}, $0.042$ on \dataset{Amazon}
+at one seed. On \dataset{Optima} it does not. So generated consequence text can carry
+choice-relevant information beyond the attributes it was generated from, and often does.
+
+Two qualifications. The amounts are small next to what combination alone supplies, and on two
+datasets the \emph{pooled} gain is still mostly the bound of \Cref{eq:floor} rather than the
+identified content: a channel can carry real information and still owe most of its apparent
+benefit to mixing. And the ranking by identified content differs from the ranking by pooled
+gain, so the pooled number does not indicate which datasets have content.
 
 \paragraph{What it does not support.} No causal identification: nothing tests the sequential
 ignorability that \emph{mediation} would require \citep{imai2010general}, which is why we avoid
