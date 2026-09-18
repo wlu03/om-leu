@@ -1,0 +1,642 @@
+/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py:93: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+Consider using tensor.detach() first. (Triggered internally at /Users/runner/work/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:823.)
+  return float(loss_fn())
+[amazon s7 chrono pi=val] full_model                 nll=0.3694 sem_only=1.6134 pi=0.064 top1= 92.9%  (2s)
+[amazon s7 chrono pi=val] global_weights             nll=0.3708 sem_only=1.6124 pi=0.064 top1= 92.9%  (1s)
+[amazon s7 chrono pi=val] no_person_weights          nll=0.3708 sem_only=1.6124 pi=0.064 top1= 92.9%  (1s)
+[amazon s7 chrono pi=val] no_probe                   nll=0.3695 sem_only=1.6137 pi=0.065 top1= 92.9%  (0s)
+[amazon s7 chrono pi=val] no_projection              nll=0.3691 sem_only=1.6178 pi=0.064 top1= 91.9%  (2s)
+[amazon s7 chrono pi=val] no_salience                nll=0.3692 sem_only=1.6074 pi=0.064 top1= 92.9%  (1s)
+[amazon s7 chrono pi=val] no_sentences               nll=0.5071 sem_only=nan pi=0.002 top1= 91.9%  (0s)
+[amazon s7 chrono pi=val] no_slot_dropout            nll=0.3694 sem_only=1.6134 pi=0.064 top1= 92.9%  (1s)
+[amazon s7 chrono pi=val] person_attention           nll=0.3695 sem_only=1.6087 pi=0.064 top1= 92.9%  (1s)
+[amazon s7 chrono pi=val] plain_nn_all_inputs        nll=0.3220 sem_only=0.6001 pi=0.160 top1= 91.9%  (2s)
+[amazon s7 chrono pi=val] plain_nn_numeric           nll=0.3612 sem_only=1.1606 pi=0.077 top1= 91.9%  (2s)
+[amazon s7 chrono pi=val] plain_nn_sentences         nll=0.3705 sem_only=1.6094 pi=0.064 top1= 91.9%  (0s)
+[amazon s7 chrono pi=val] plain_nn_sentences_flat    nll=0.3705 sem_only=1.6095 pi=0.064 top1= 92.9%  (1s)
+[amazon s7 chrono pi=val] plain_nn_sentences_person  nll=0.3704 sem_only=1.6094 pi=0.064 top1= 92.9%  (0s)
+[amazon s7 chrono pi=val] single_head                nll=0.3742 sem_only=1.6088 pi=0.065 top1= 91.9%  (1s)
+[amazon s7 chrono pi=val] single_member              nll=0.3647 sem_only=1.6365 pi=0.064 top1= 92.9%  (0s)
+[amazon s7 chrono pi=oof] full_model: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] global_weights: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] no_person_weights          nll=1.6124 sem_only=1.6124 pi=1.000 top1= 16.2%  (8s)
+[amazon s7 chrono pi=oof] no_probe: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] no_projection: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] no_salience: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 524, in _fit_scalars_oof
+    nll = lbfgs_prefit(loss, scalars, max_iter=200)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] no_sentences               nll=0.5071 sem_only=nan pi=0.002 top1= 91.9%  (0s)
+[amazon s7 chrono pi=oof] no_slot_dropout: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] person_attention: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] plain_nn_all_inputs: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] plain_nn_numeric: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 524, in _fit_scalars_oof
+    nll = lbfgs_prefit(loss, scalars, max_iter=200)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] plain_nn_sentences         nll=1.6094 sem_only=1.6094 pi=1.000 top1= 19.2%  (5s)
+[amazon s7 chrono pi=oof] plain_nn_sentences_flat: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] plain_nn_sentences_person: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] single_head: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 chrono pi=oof] single_member: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 person pi=val] full_model                 nll=1.4437 sem_only=1.5933 pi=0.344 top1= 39.0%  (2s)
+[amazon s7 person pi=val] global_weights             nll=1.4444 sem_only=1.5936 pi=0.345 top1= 39.0%  (1s)
+[amazon s7 person pi=val] no_person_weights          nll=1.4444 sem_only=1.5936 pi=0.345 top1= 39.0%  (1s)
+[amazon s7 person pi=val] no_probe                   nll=1.4477 sem_only=1.5999 pi=0.351 top1= 36.7%  (1s)
+[amazon s7 person pi=val] no_projection              nll=1.4434 sem_only=1.5882 pi=0.328 top1= 39.0%  (4s)
+[amazon s7 person pi=val] no_salience                nll=1.4443 sem_only=1.5908 pi=0.350 top1= 36.7%  (1s)
+[amazon s7 person pi=val] no_sentences               nll=1.5581 sem_only=nan pi=0.002 top1= 37.3%  (0s)
+[amazon s7 person pi=val] no_slot_dropout            nll=1.6022 sem_only=1.6022 pi=1.000 top1= 27.7%  (1s)
+[amazon s7 person pi=val] person_attention           nll=1.4462 sem_only=1.5961 pi=0.348 top1= 39.5%  (1s)
+[amazon s7 person pi=val] plain_nn_all_inputs        nll=1.3750 sem_only=1.3920 pi=0.818 top1= 37.9%  (1s)
+[amazon s7 person pi=val] plain_nn_numeric: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 person pi=val] plain_nn_sentences         nll=1.4489 sem_only=1.6017 pi=0.341 top1= 38.4%  (1s)
+[amazon s7 person pi=val] plain_nn_sentences_flat    nll=1.4584 sem_only=1.6129 pi=0.315 top1= 37.3%  (1s)
+[amazon s7 person pi=val] plain_nn_sentences_person  nll=1.4501 sem_only=1.5981 pi=0.334 top1= 41.8%  (1s)
+[amazon s7 person pi=val] single_head                nll=1.4476 sem_only=1.5965 pi=0.341 top1= 39.0%  (1s)
+[amazon s7 person pi=val] single_member              nll=1.4397 sem_only=1.5921 pi=0.331 top1= 38.4%  (0s)
+[amazon s7 person pi=oof] full_model                 nll=1.4459 sem_only=1.5933 pi=0.311 top1= 38.4%  (8s)
+[amazon s7 person pi=oof] global_weights             nll=1.4471 sem_only=1.5936 pi=0.303 top1= 39.5%  (4s)
+[amazon s7 person pi=oof] no_person_weights          nll=1.4469 sem_only=1.5936 pi=0.306 top1= 39.0%  (4s)
+[amazon s7 person pi=oof] no_probe                   nll=1.4494 sem_only=1.5999 pi=0.319 top1= 36.7%  (3s)
+[amazon s7 person pi=oof] no_projection              nll=1.4444 sem_only=1.5882 pi=0.318 top1= 37.9%  (18s)
+[amazon s7 person pi=oof] no_salience                nll=1.4465 sem_only=1.5908 pi=0.315 top1= 37.9%  (5s)
+[amazon s7 person pi=oof] no_sentences               nll=1.5581 sem_only=nan pi=0.002 top1= 37.3%  (0s)
+[amazon s7 person pi=oof] no_slot_dropout: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 506, in _fit_scalars_oof
+    run_k(m_k, fb, seed)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 582, in run
+    val_nll = model.stack_on_val(b)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 474, in stack_on_val
+    lbfgs_prefit(loss, scalars, max_iter=200)
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 person pi=oof] person_attention           nll=1.4482 sem_only=1.5961 pi=0.314 top1= 40.1%  (5s)
+[amazon s7 person pi=oof] plain_nn_all_inputs        nll=1.3730 sem_only=1.3920 pi=0.761 top1= 38.4%  (7s)
+[amazon s7 person pi=oof] plain_nn_numeric: FAILED
+Traceback (most recent call last):
+  File "/Users/wesleylu/Projects/Research/structure_descent/ablation/run.py", line 53, in main
+    info = run(model, b, seed)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 578, in run
+    oof_info = _fit_scalars_oof(model, b, seed, cfg, view)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/models/omleu2.py", line 524, in _fit_scalars_oof
+    nll = lbfgs_prefit(loss, scalars, max_iter=200)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/experiments/harness/train.py", line 92, in lbfgs_prefit
+    opt.step(closure)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 530, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 471, in step
+    loss, flat_grad, t, ls_func_evals = _strong_wolfe(
+                                        ^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 91, in _strong_wolfe
+    f_new, g_new = obj_func(x, t, d)
+                   ^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 469, in obj_func
+    return self._directional_evaluate(closure, x, t, d)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 319, in _directional_evaluate
+    self._add_grad(t, d)
+  File "/Users/wesleylu/Projects/Research/structure_descent/venv/lib/python3.12/site-packages/torch/optim/lbfgs.py", line 306, in _add_grad
+    p.add_(update[offset : offset + numel].view_as(p), alpha=step_size)
+RuntimeError: value cannot be converted to type float without overflow
+
+[amazon s7 person pi=oof] plain_nn_sentences         nll=1.4506 sem_only=1.6017 pi=0.312 top1= 38.4%  (4s)
+[amazon s7 person pi=oof] plain_nn_sentences_flat    nll=1.4593 sem_only=1.6129 pi=0.306 top1= 36.7%  (5s)
+[amazon s7 person pi=oof] plain_nn_sentences_person  nll=1.4518 sem_only=1.5981 pi=0.307 top1= 40.7%  (5s)
+[amazon s7 person pi=oof] single_head                nll=1.4493 sem_only=1.5965 pi=0.316 top1= 39.0%  (6s)
+[amazon s7 person pi=oof] single_member              nll=1.4415 sem_only=1.5921 pi=0.308 top1= 38.4%  (1s)
